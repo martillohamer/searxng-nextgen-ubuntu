@@ -16,7 +16,7 @@ search:
     - json
 outgoing:
   request_timeout: 8.0
-  max_request_timeout: 20.0
+  max_request_timeout: 12.0
   retries: 1
 
 engines:
@@ -32,25 +32,9 @@ engines:
     disabled: false
   - name: mojeek
     disabled: false
-    timeout: 15.0
-    proxies:
-      all://:
-        - socks5h://tor:9150
   - name: wikipedia
     disabled: false
-    timeout: 15.0
-    proxies:
-      all://:
-        - socks5h://tor:9150
   - name: github
     disabled: false
-    timeout: 15.0
-    proxies:
-      all://:
-        - socks5h://tor:9150
   - name: stackoverflow
     disabled: false
-    timeout: 15.0
-    proxies:
-      all://:
-        - socks5h://tor:9150

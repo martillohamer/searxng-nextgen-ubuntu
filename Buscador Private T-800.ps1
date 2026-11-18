@@ -6,7 +6,7 @@ param(
     [string]$Modo = "Directo"
 )
 
-$baseDir      = "C:\Users\astur\Desktop\searxng-nextgen"
+$baseDir      = $PSScriptRoot
 $searxDir     = Join-Path $baseDir "searx"
 $settingsFile = Join-Path $searxDir "settings.yml"
 $prodFile     = Join-Path $baseDir "docker-compose.prod.yml"
@@ -84,7 +84,8 @@ $torTolerant = @("wikipedia", "github", "stackoverflow", "mojeek")
 
 $engineBlocks = foreach ($e in $engineNames) {
     $blk = "  - name: $e`n    disabled: false"
-    if ($Modo -eq "Hibrido" -and ($torTolerant -contains $e)) {$blk += "`n    timeout: 15.0`n    proxies:`n      all://:`n        - socks5h://tor:9150"
+    if ($Modo -eq "Hibrido" -and ($torTolerant -contains $e)) {
+        $blk += "`n    timeout: 15.0`n    proxies:`n      all://:`n        - socks5h://tor:9150"
     }
     $blk
 }
@@ -110,7 +111,7 @@ search:
 
 "@
 
-$settingsContent = $head +$outgoing + "`n`n" + $enginesYaml + "`n"
+$settingsContent = $head + $outgoing + "`n`n" + $enginesYaml + "`n"
 [System.IO.File]::WriteAllText($settingsFile, $settingsContent, $utf8NoBom)
 
 Write-Host "[2/5] Levantando clúster en Docker (Core, Tor y UI)..." -ForegroundColor Cyan
