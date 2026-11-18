@@ -20,7 +20,7 @@ outgoing:
   max_request_timeout: 20.0
   retries: 2
   proxy:
-    - socks5://searvga_tor:9150
+    - socks5h://searvga_tor:9150
 
 engines:
   - name: duckduckgo

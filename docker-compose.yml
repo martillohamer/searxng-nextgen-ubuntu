@@ -16,14 +16,22 @@ services:
       driver: "none"
     depends_on:
       - tor
+
   tor:
     image: peterdavehello/tor-socks-proxy:latest
     container_name: searvga_tor
     restart: unless-stopped
     tmpfs:
       - /tmp:size=64M,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9150"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging:
       driver: "none"
+
   ui:
     image: nginx:alpine
     container_name: searvga_ui
