@@ -103,13 +103,13 @@ input::placeholder{color:var(--c2);opacity:.7}
     <!-- FASE 3: Barra de Dorks de Inspector -->
     <div class="bar-inspector" style="margin-top:12px;background:rgba(0,0,0,.5);border-top:1px solid var(--dim);padding:6px 0;">
       <span style="color:var(--c2);font-size:11px;letter-spacing:.1em;">DORKS:</span>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="filetype:pdf">[PDF]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="filetype:xlsx+filetype:csv+filetype:json">[DATOS]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="filetype:docx+filetype:doc+filetype:txt">[DOCS]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="intitle:%22index+of%22">[INDEX OF]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="site:archive.org">[ARCHIVE]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="site:github.com+OR+site:gitlab.com">[GIT/CODE]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" data-dork="onions">[ONION]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="filetype:pdf">[PDF]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="filetype:xlsx filetype:csv filetype:json">[DATOS]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="filetype:docx filetype:doc filetype:txt">[DOCS]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork='intitle:"index of"'>[INDEX OF]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="site:archive.org">[ARCHIVE]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="site:github.com OR site:gitlab.com">[GIT/CODE]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="onions">[ONION]</button>
     </div>
     
     <div class="cats" id="cats"></div>
@@ -219,7 +219,7 @@ function render(d,append,ms){
     (d.answers||[]).forEach(function(a){
       var t=typeof a==="string"?a:(a&&a.answer)||"";if(t)out.appendChild(h("div","ans","[RESPUESTA DIRECTA] "+t));
     });
-    var sg=$("sug");sg.textContent="";
+    var sg=$("sug");if(sg)sg.textContent="";
     if((d.suggestions||[]).length){
       sg.appendChild(document.createTextNode("QUISISTE DECIR:"));
       d.suggestions.slice(0,5).forEach(function(s){
@@ -366,20 +366,18 @@ function exportForenseReport(result){
 }
 
 // Inicialización mejorada
-$(function(){
-  // Aplicar dorks cuando se hacen clic
-  document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
-    btn.onclick = function(){
-      var dork = this.dataset.dork;
-      var q = $("q");
-      if(q.value){
-        q.value += " " + dork;
-      } else {
-        q.value = dork;
-      }
-      q.focus();
-    };
-  });
+document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
+  btn.onclick = function(){
+    var dork = this.dataset.dork;
+    var q = $("q");
+    if(!q) return;
+    if(q.value.trim()){
+      q.value = q.value.trim() + " " + dork;
+    } else {
+      q.value = dork;
+    }
+    q.focus();
+  };
 });
 
 // Cargar modo guardado
@@ -389,6 +387,30 @@ if(!savedMode||savedMode==="matrix")document.getElementById("mode").textContent=
 
 // Iniciar lluvia después de que el DOM esté listo
 setTimeout(function(){if(!matchMedia("(prefers-reduced-motion:reduce)").matches)requestAnimationFrame(rain);}, 100);
+
+(function(){
+  var form = document.getElementById("f");
+  var inp = document.getElementById("q");
+  if(form && inp){
+    form.addEventListener("submit", function(ev){
+      ev.preventDefault();
+      var val = inp.value.trim();
+      if(val && typeof run === "function"){
+        run(val, 1, false);
+      }
+    });
+  }
+  document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
+    btn.setAttribute("type", "button");
+    btn.onclick = function(){
+      if(!inp) return;
+      var dork = this.dataset.dork || "";
+      inp.value = inp.value.trim() ? (inp.value.trim() + " " + dork) : dork;
+      inp.focus();
+    };
+  });
+})();
+
 })();
 </script>
 </body>
