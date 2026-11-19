@@ -194,10 +194,18 @@ async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> tuple[by
                 ct = response.headers.get("content-type", "")
                 return bytes(content), ct
         except HTTPException:
-            # Volver a lanzar HTTPException (incluye los 400 de tamaño y los 403/404 etc.)
+            # Volver a lanzar HTTPException (incluye 400 SSRF y 413 por tamaño)
             raise
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            if code in (401, 403, 404, 429):
+                raise HTTPException(
+                    status_code=code,
+                    detail=f"Respuesta HTTP {code} del servidor remoto a través de Tor (si es 403/429, prueba ./rotar-ip-tor.sh)"
+                )
+            raise HTTPException(status_code=502, detail=f"Error HTTP {code} del origen vía Tor: {str(e)}")
         except httpx.HTTPError as e:
-            raise HTTPException(status_code=502, detail=f"Error de red Tor: {str(e)}")
+            raise HTTPException(status_code=502, detail=f"Error de red/conexión Tor: {str(e)}")
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error inesperado: {str(e)}")
 
