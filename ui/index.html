@@ -109,7 +109,7 @@ input::placeholder{color:var(--c2);opacity:.7}
       <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork='intitle:"index of"'>[INDEX OF]</button>
       <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="site:archive.org">[ARCHIVE]</button>
       <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="site:github.com OR site:gitlab.com">[GIT/CODE]</button>
-      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-dork="onions">[ONION]</button>
+      <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-onion="1">[ONION]</button>
     </div>
     
     <div class="cats" id="cats"></div>
@@ -408,9 +408,20 @@ setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 1000);
 // Inicialización mejorada
 document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
   btn.onclick = function(){
-    var dork = this.dataset.dork;
     var q = $("q");
     if(!q) return;
+    if(this.dataset.onion === "1"){
+      state.cat = "onions";
+      document.querySelectorAll("#cats .chip").forEach(function(x){x.classList.remove("on");});
+      this.classList.toggle("on");
+      if(q.value.trim()){
+        run(q.value.trim(), 1, false);
+      }
+      q.focus();
+      return;
+    }
+    var dork = this.dataset.dork;
+    if(!dork) return;
     if(q.value.trim()){
       q.value = q.value.trim() + " " + dork;
     } else {
