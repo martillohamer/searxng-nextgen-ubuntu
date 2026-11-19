@@ -78,6 +78,7 @@ input::placeholder{color:var(--c2);opacity:.7}
 .dot.err{background:#ff2d20;box-shadow:0 0 8px #ff2d20}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.res,.img{opacity:1}}
 @media (max-width:560px){.go{display:none}.top{font-size:10px}}
+.chip.onion-on{border-color:#ff2d20!important;color:#ff5c52!important;background:rgba(255,45,32,.16)!important;box-shadow:0 0 12px rgba(255,45,32,.45)}
 </style>
 </head>
 <body>
@@ -178,7 +179,8 @@ CATS.forEach(function(c){
   var b=h("button","chip"+(c[0]==="general"?" on":""),c[1]);b.type="button";b.dataset.c=c[0];
   b.onclick=function(){
     state.cat=c[0];
-    document.querySelectorAll(".chip").forEach(function(x){x.classList.toggle("on",x===b)});
+    document.querySelectorAll("#cats .chip").forEach(function(x){x.classList.toggle("on",x===b)});
+    document.querySelectorAll('[data-onion="1"]').forEach(function(x){x.classList.remove("onion-on");});
     if(state.q)run(state.q,1,false);
   };
   $("cats").appendChild(b);
@@ -417,7 +419,8 @@ document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
     if(this.dataset.onion === "1"){
       var turningOn = state.cat !== "onions";
       state.cat = turningOn ? "onions" : "general";
-      this.classList.toggle("on", turningOn);
+      this.classList.toggle("onion-on", turningOn);
+      this.classList.remove("on");
       document.querySelectorAll("#cats .chip").forEach(function(x){
         x.classList.toggle("on", !turningOn && x.dataset.c === "general");
       });
