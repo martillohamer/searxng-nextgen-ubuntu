@@ -78,7 +78,7 @@ input::placeholder{color:var(--c2);opacity:.7}
 .dot.err{background:#ff2d20;box-shadow:0 0 8px #ff2d20}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.res,.img{opacity:1}}
 @media (max-width:560px){.go{display:none}.top{font-size:10px}}
-button.chip[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#ff8078!important;background:rgba(255,45,32,.24)!important;box-shadow:0 0 14px rgba(255,45,32,.65)!important}
+button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!important;background:rgba(255,45,32,.24)!important;box-shadow:0 0 14px rgba(255,45,32,.65)!important;text-shadow:0 0 8px #ff2d20!important}
 </style>
 </head>
 <body>
@@ -179,8 +179,7 @@ CATS.forEach(function(c){
   var b=h("button","chip"+(c[0]==="general"?" on":""),c[1]);b.type="button";b.dataset.c=c[0];
   b.onclick=function(){
     state.cat=c[0];
-    document.querySelectorAll("#cats .chip").forEach(function(x){x.classList.toggle("on",x===b)});
-    document.querySelectorAll('[data-onion="1"]').forEach(function(x){x.classList.remove("onion-on");});
+    updateUIState();
     if(state.q)run(state.q,1,false);
   };
   $("cats").appendChild(b);
@@ -411,65 +410,50 @@ document.body.removeChild(e);
 setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 1000);
 }
 
-// Inicialización mejorada
+// Inicialización de botones de categoría y ONION
+function updateUIState(){
+  document.querySelectorAll("#cats .chip").forEach(function(x){
+    x.classList.toggle("on", state.cat === x.dataset.c);
+  });
+  document.querySelectorAll('[data-onion="1"]').forEach(function(x){
+    x.classList.toggle("onion-on", state.cat === "onions");
+  });
+}
+
+// Handler para categorías
+document.querySelectorAll("#cats .chip").forEach(function(btn){
+  btn.onclick = function(){
+    state.cat = btn.dataset.c;
+    updateUIState();
+    if(state.q) run(state.q, 1, false);
+  };
+});
+
+// Handler para botones dorks y ONION
 document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
   btn.onclick = function(){
-    var q = $("q");
-    if(!q) return;
     if(this.dataset.onion === "1"){
       var turningOn = state.cat !== "onions";
       state.cat = turningOn ? "onions" : "general";
-      this.classList.toggle("onion-on", turningOn);
-      this.classList.remove("on");
-      document.querySelectorAll("#cats .chip").forEach(function(x){
-        x.classList.toggle("on", !turningOn && x.dataset.c === "general");
-      });
-      if(q.value.trim()){
-        run(q.value.trim(), 1, false);
-      }
-      q.focus();
+      updateUIState();
+      if(state.q) run(state.q, 1, false);
       return;
     }
-    var dork = this.dataset.dork;
-    if(!dork) return;
-    if(q.value.trim()){
-      q.value = q.value.trim() + " " + dork;
-    } else {
-      q.value = dork;
-    }
+    var q = $("q");
+    if(!q) return;
+    var dork = this.dataset.dork || "";
+    q.value = q.value.trim() ? (q.value.trim() + " " + dork) : dork;
     q.focus();
   };
 });
 
-// Cargar modo guardado
-var savedMode = localStorage.getItem("searvga-mode");
-if(savedMode)document.documentElement.setAttribute("data-mode",savedMode);
-if(!savedMode||savedMode==="matrix")document.getElementById("mode").textContent="Modo: "+(document.documentElement.getAttribute("data-mode")==="matrix"?"Matrix":"T-800");
-
-// Iniciar lluvia después de que el DOM esté listo
-setTimeout(function(){if(!matchMedia("(prefers-reduced-motion:reduce)").matches)requestAnimationFrame(rain);}, 100);
-
+// Inicializar estado desde URL
 (function(){
-  var form = document.getElementById("f");
-  var inp = document.getElementById("q");
-  if(form && inp){
-    form.addEventListener("submit", function(ev){
-      ev.preventDefault();
-      var val = inp.value.trim();
-      if(val && typeof run === "function"){
-        run(val, 1, false);
-      }
-    });
-  }
-  document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
-    btn.setAttribute("type", "button");
-    btn.onclick = function(){
-      if(!inp) return;
-      var dork = this.dataset.dork || "";
-      inp.value = inp.value.trim() ? (inp.value.trim() + " " + dork) : dork;
-      inp.focus();
-    };
-  });
+  var params = new URLSearchParams(window.location.search);
+  var cat = params.get("c");
+  var q = params.get("q");
+  if(cat){ state.cat = cat; updateUIState(); }
+  if(q){ $("q").value = q; run(q, 1, false); }
 })();
 
 })();
