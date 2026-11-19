@@ -145,7 +145,8 @@ $("mode").textContent="Modo: "+(root.getAttribute("data-mode")==="matrix"?"Matri
 
 var cv=$("rain"),cx=cv.getContext("2d"),fs=16,drops=[],dcol="#00ff66",dbg="#010a04";
 var glyphs="ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789<>/\\=+*#$%";
-function readColor(){var s=getComputedStyle(root);col=s.getPropertyValue("--c").trim();bg=s.getPropertyValue("--bg").trim()}
+var col="#00ff66",bg="#010a04";
+function readColor(){var s=getComputedStyle(root);col=s.getPropertyValue("--c").trim()||col;bg=s.getPropertyValue("--bg").trim()||bg}
 function size(){cv.width=innerWidth;cv.height=innerHeight;var n=Math.ceil(cv.width/fs);drops=[];for(var i=0;i<n;i++)drops.push(Math.random()*-60)}
 addEventListener("resize",size);readColor();size();var last=0;
 function rain(t){
@@ -305,7 +306,7 @@ function showInspectModal(data, url){
   closeBtn.style.padding="8px 12px";closeBtn.style.cursor="pointer";closeBtn.onclick=function(){modal.remove();};
   closeBtn.textContent="CLOSE";
   
-  var title = h2=document.createElement("h2");
+  var title = document.createElement("h2");
   title.style.margin="0 0 15px";title.style.fontSize="16px";title.textContent="INSPECCIÓN DE METADATOS - " + url;
   
   var jsonDiv = document.createElement("pre");
