@@ -25,7 +25,7 @@ fi
 
 echo "[3/4] Esperando circuito Tor (healthy)..."
 for i in {1..30}; do
-    STATUS=$(docker inspect --format='{{.State.Health.Status}}' searvga_tor 2>/dev/null || echo "starting")
+    STATUS=$(docker inspect --format="{{.State.Health.Status}}" searvga_tor 2>/dev/null || echo "starting")
     if [ "$STATUS" = "healthy" ]; then
         echo "      -> Tunel Tor ACTIVO y saludable ($i s)."
         break
