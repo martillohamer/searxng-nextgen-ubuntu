@@ -16,13 +16,57 @@ search:
     - json
 
 outgoing:
-  request_timeout: 10.0
-  max_request_timeout: 20.0
-  retries: 2
+  request_timeout: 15.0
+  max_request_timeout: 30.0
+  retries: 3
   proxy:
     - socks5h://searvga_tor:9150
 
 engines:
+  # Motores .onion (Red Tor) - configurados para usar proxy searvga_tor
+  - name: ahmia
+    disabled: false
+    categories: [onions]
+    timeout: 15.0
+    # proxy: socks5h://searvga_tor:9150  # Usa el proxy global definido arriba
+
+  # Motiv profundos y repositorios científicos (OSINT Legal)
+  - name: arxiv
+    disabled: false
+    categories: [science]
+    timeout: 15.0
+
+  - name: github
+    disabled: false
+    categories: [code]
+    timeout: 15.0
+
+  - name: github_code
+    disabled: false
+    categories: [code]
+    timeout: 15.0
+
+  - name: gitlab
+    disabled: false
+    categories: [code]
+    timeout: 15.0
+
+  - name: openalex
+    disabled: false
+    categories: [science]
+    timeout: 15.0
+
+  - name: semantic_scholar
+    disabled: false
+    categories: [science]
+    timeout: 15.0
+
+  - name: annas_archive
+    disabled: false
+    categories: [files]
+    timeout: 15.0
+
+  # Motores generales existentes (mantener compatibilidad UI T-800)
   - name: duckduckgo
     disabled: false
   - name: google
@@ -36,8 +80,6 @@ engines:
   - name: mojeek
     disabled: false
   - name: wikipedia
-    disabled: false
-  - name: github
     disabled: false
   - name: stackoverflow
     disabled: false
