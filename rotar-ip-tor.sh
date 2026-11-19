@@ -1,52 +1,32 @@
 #!/bin/bash
-# Script de rotación rápida de circuito Tor (NEWNYM)
-# Diseñado para ejecutarse dentro del clúster tubuntu-searxng-nextgen
-# Usa el ControlPort expuesto en 127.0.0.1:9151 por searvga_tor
-
-# Configuración
-CONTROL_PORT="9151"
-TOR_CONTAINER="searvga_tor"
+set -u
+TOR_NAME="searvga_tor"
+SOCKS_PORT="9150"
 MAX_CIRCUIT_DIRTINESS=180
-
-echo "=== Rotación de circuito Tor (NEWNYM) ==="
+MAX_WAIT_HEALTH=50
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+get_tor_ip() { docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" "${TOR_NAME}" 2>/dev/null | awk "NF {print \$1; exit}"; }
+check_exit_ip() { [ -n "$1" ] && python3 "${SCRIPT_DIR}/check_tor_ip.py" "$1" "${SOCKS_PORT}" | head -n 1 | tr -d "[:space:]"; }
+echo "=== Rotacion de circuito Tor ==="
 echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
-
-# Verificar que el contenedor Tor está corriendo
-if ! docker ps --filter "name=$TOR_CONTAINER" | grep -q "$TOR_CONTAINER"; then
-    echo "ERROR: Contenedor $TOR_CONTAINER no está running"
-    exit 1
-fi
-
-# Enviar señal AUTHENTICATE + NEWNYM al ControlPort de Tor
-# Nota: El proxy peterdavehello/tor-socks-proxy usa autenticación vacía por defecto
-RESPONSE=$(echo -e "AUTHENTICATE \"\"\nsignal NEWNYM\nQUIT" | nc -w 5 127.0.0.1 $CONTROL_PORT 2>&1)
-
-if [ $? -eq 0 ] && echo "$RESPONSE" | grep -q "250"; then
-    echo "✅ Señal NEWNYM enviada exitosamente a Tor ControlPort $CONTROL_PORT"
-    echo "   Nuevo circuito Tor establecido"
-else
-    echo "⚠️  Intento NEWNYM devuelto: $RESPONSE"
-    echo "   Intentando método alternativo..."
-    
-    # Método alternativo: reiniciar el servicio Tor dentro del contenedor
-    docker restart $TOR_CONTAINER 2>&1 | tail -1
-    echo "   Servicio Tor reiniciado"
-fi
-
-# Verificar nueva IP de salida mediante curl a través del proxy SOCKS5
-echo ""
-echo "=== Verificación de nueva IP de salida ==="
-NEW_IP=$(curl -s --socks5 127.0.0.1:9150 -m 10 --interface 127.0.0.1 http://ifconfig.me 2>/dev/null || echo "fallo_curl")
-echo "IP de salida actual: $NEW_IP"
-
-# Mostrar información de circuito actual
-echo ""
-echo "=== Estado de circuito ==="
-echo "MaxCircuitDirtiness configurado: $MAX_CIRCUIT_DIRTINESS segundos"
-echo "Próxima rotación automática ocurrirá después de este tiempo"
-
-echo ""
-echo "=== Rotación de circuito completada ==="
+if ! docker ps --filter "name=^/${TOR_NAME}$" --format "{{.Names}}" | grep -q "^${TOR_NAME}$"; then echo "ERROR: ${TOR_NAME} no esta en ejecucion"; exit 1; fi
+OLD_EXIT_IP=$(check_exit_ip "$(get_tor_ip)")
+[ -n "$OLD_EXIT_IP" ] && echo "IP de salida anterior: ${OLD_EXIT_IP}"
+echo "Reiniciando ${TOR_NAME}..."
+docker restart "${TOR_NAME}" >/dev/null
+elapsed=0
+while [ "$elapsed" -lt "$MAX_WAIT_HEALTH" ]; do
+  st=$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" "${TOR_NAME}" 2>/dev/null || echo "unknown")
+  [ "$st" = "healthy" ] || [ "$st" = "running" ] && break
+  sleep 2; elapsed=$((elapsed + 2))
+done
+NEW_IP="no_verificada"
+for i in 1 2 3 4; do
+  ip_try=$(check_exit_ip "$(get_tor_ip)")
+  if [ -n "$ip_try" ]; then NEW_IP="$ip_try"; break; fi
+  sleep 2
+done
+echo "IP de salida actual: ${NEW_IP}"
+[ -n "$OLD_EXIT_IP" ] && [ "$NEW_IP" != "no_verificada" ] && [ "$OLD_EXIT_IP" != "$NEW_IP" ] && echo "Cambio verificado: ${OLD_EXIT_IP} -> ${NEW_IP}"
+echo "MaxCircuitDirtiness configurado: ${MAX_CIRCUIT_DIRTINESS} segundos"
 echo "Timestamp final: $(date '+%Y-%m-%d %H:%M:%S')"
-
-exit 0

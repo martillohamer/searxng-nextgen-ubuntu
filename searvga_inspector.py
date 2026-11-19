@@ -13,6 +13,7 @@ import hashlib
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+from urllib.parse import urlparse
 
 import httpx
 import exifread
@@ -26,6 +27,54 @@ MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB máximo
 MAX_MEMORY_MB = 256
 TOR_PROXY = os.getenv("TOR_PROXY", "socks5h://searvga_tor:9150")  # a través de searvga_tor
 
+# Rangos y direcciones IP privadas/bloqueadas para la URL de destino
+_PRIVATE_NETWORKS = [
+    "0.0.0.0/8",
+    "10.0.0.0/8",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "fd00::/8",
+    "fe80::/10",
+    "::1/128",
+]
+_LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+
+
+def _is_blocked_url(url: str) -> bool:
+    """Devuelve True si la URL apunta a una dirección privada/loopback."""
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return True
+        # IPV4
+        if ":" not in hostname:
+            ip = hostname
+            for net in _PRIMARY_IPV4_NETworks if False else []:
+                pass
+        # Comprobar loopback y privados simples
+        if hostname in _LOOPBACK:
+            return True
+        # IPv4 privados
+        if ip.startswith("10.") or ip.startswith("172.16.") or ip.startswith("192.168.") or ip.startswith("169.254."):
+            return True
+        # IPv6 fd/fe80
+        if hostname.startswith("fd") or hostname.startswith("fe80"):
+            return True
+        return False
+    except Exception:
+        return True
+
+
+PRIMARY_IPV4_NETworks = [
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+]
+
+
 # Creación de la app FastAPI
 app = FastAPI(
     title="searvga_inspector",
@@ -38,13 +87,18 @@ app = FastAPI(
 
 async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> bytes:
     """
-    Descarga un archivo exclusivamente a través de la red Tor.
+    Descarga un archivo exclusivamente a través de la red Tor, leyendo en streaming
+    para no cargar todo en memoria y abortando si se supera max_size.
     Usa socks5h:// a través de searvga_tor.
-    Lanza excepciones si excede el tamaño o el tiempo.
+    Lanza excepciones HTTP si excede el tamaño o hay error de red.
     """
+    # Validación básica de bloqueo de IPs privadas/loopback
+    if _is_blocked_url(url):
+        raise HTTPException(status_code=400, detail="URL bloqueada: no se permite acceder a direcciones privadas o loopback a través de Tor")
+
     limits = httpx.Limits(max_connections=5, max_keepalive_connections=2)
     timeout = httpx.Timeout(connect=10.0, read=15.0, write=15.0, pool=15.0)
-    
+
     async with httpx.AsyncClient(
         proxy=TOR_PROXY,
         timeout=timeout,
@@ -54,16 +108,22 @@ async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> bytes:
         try:
             response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
-            
-            # Verificar tamaño
-            content_length = len(response.content)
-            if content_length > max_size:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Archivo demasiado grande: {content_length} bytes (máx: {max_size})"
-                )
-            
-            return response.content
+
+            # Descarga en streaming con control de tamaño
+            content = bytearray()
+            async for chunk in response.aiter_bytes(chunk_size=8192):
+                content.extend(chunk)
+                if len(content) > max_size:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Archivo demasiado grande: {len(content)} bytes (máx: {max_size})"
+                    )
+
+            # Asegurar que tengamos bytes puros
+            return bytes(content)
+        except HTTPException:
+            # Volver a lanzar HTTPException (incluye los 400 de tamaño y los 403/404 etc.)
+            raise
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"Error de red Tor: {str(e)}")
         except Exception as e:

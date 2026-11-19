@@ -245,18 +245,40 @@ function render(d,append,ms){
   list.forEach(function(r,i){
     if(isImg){
       var src=r.thumbnail_src||r.img_src||r.thumbnail;if(!src)return;
-      var a=h("img");a.href=safe(r.url);a.target="_blank";a.rel="noopener noreferrer";a.title=r.title||"";
-      a.dataset.i=i;a.style.cursor="zoom-in";
-      a.onclick=function(){
-        // FASE 3: Abrir modal de inspección de metadatos
+      var a = h("a", "img"); // <a class="img"> wrapper
+      a.href = safe(r.url);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.title = r.title || "";
+      // <img> interior
+      var im = document.createElement("img");
+      im.src = safe(src);
+      im.loading = "lazy";
+      im.referrerPolicy = "no-referrer";
+      im.alt = r.title || "";
+      a.appendChild(im);
+      // handler de clic para inspección de metadatos (FASE 3)
+      a.onclick = function(){
         var url = a.href;
         fetch("/inspect?url=" + encodeURIComponent(url))
-        .then(r=>r.json())
-        .then(data=>showInspectModal(data, url))
-        .catch(e=>console.error("Inspección fallida:",e));
+          .then(r => {
+            if (!r.ok) {
+              // intentar leer detail/mensaje del JSON de error
+              return r.json().then(j => { throw new Error(j.detail || j.message || `HTTP ${r.status}`); });
+            }
+            return r.json();
+          })
+          .then(data => showInspectModal(data, url))
+          .catch(e => {
+            // Mostrar mensaje claro en la interfaz (evitar que caiga a consola)
+            var out = $("out");
+            out.textContent = "";
+            var m = h("div", "msg", "ERROR DE INSPECCIÓN: " + (e.message || e));
+            out.appendChild(m);
+            console.error("Inspección fallida:", e);
+          });
       };
-      var im=document.createElement("img");im.src=safe(src);im.loading="lazy";im.referrerPolicy="no-referrer";im.alt=r.title||"";
-      a.appendChild(im);holder.appendChild(a);
+      holder.appendChild(a);
     }else{
       var c=h("article","res");c.style.setProperty("--i",i);
       c.appendChild(h("span","n","["+pad(base+i+1)+"]"));
@@ -272,9 +294,22 @@ function render(d,append,ms){
         var url = r.url || safe(r.url || r.engines?.[0] || "");
         if(!url||!/^https?:\/\//i.test(url)){alert("URL no válida para inspección");return;}
         fetch("/inspect?url=" + encodeURIComponent(url))
-        .then(r=>r.json())
-        .then(data=>showInspectModal(data, url))
-        .catch(e=>console.error("Inspección fallida:",e));
+          .then(r => {
+            if (!r.ok) {
+              // intentar extraer detail/mensaje del error JSON
+              return r.json().then(j => { throw new Error(j.detail || j.message || `HTTP ${r.status}`); });
+            }
+            return r.json();
+          })
+          .then(data=>showInspectModal(data, url))
+          .catch(e => {
+            // Mostrar mensaje claro en la interfaz
+            var out = $("out");
+            out.textContent = "";
+            var m = h("div", "msg", "ERROR DE INSPECCIÓN: " + (e.message || e));
+            out.appendChild(m);
+            console.error("Inspección fallida:", e);
+          });
       };
       c.appendChild(inspectBtn);
       // FASE 3: Botón de exportar informe .MD
