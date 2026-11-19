@@ -415,9 +415,12 @@ document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
     var q = $("q");
     if(!q) return;
     if(this.dataset.onion === "1"){
-      state.cat = "onions";
-      document.querySelectorAll("#cats .chip").forEach(function(x){x.classList.remove("on");});
-      this.classList.toggle("on");
+      var turningOn = state.cat !== "onions";
+      state.cat = turningOn ? "onions" : "general";
+      this.classList.toggle("on", turningOn);
+      document.querySelectorAll("#cats .chip").forEach(function(x){
+        x.classList.toggle("on", !turningOn && x.dataset.c === "general");
+      });
       if(q.value.trim()){
         run(q.value.trim(), 1, false);
       }
