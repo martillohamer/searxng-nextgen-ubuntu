@@ -23,6 +23,8 @@ services:
     restart: unless-stopped
     tmpfs:
       - /tmp:size=64M,noexec,nosuid,nodev
+    environment:
+      - MAX_CIRCUIT_DIRTINESS=180
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "9150"]
       interval: 10s

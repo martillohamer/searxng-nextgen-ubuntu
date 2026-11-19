@@ -21,6 +21,14 @@ outgoing:
   retries: 3
   proxy:
     - socks5h://searvga_tor:9150
+  result_proxy:
+    type: socks5
+    address: searvga_tor
+    port: 9150
+  image_proxy:
+    type: socks5
+    address: searvga_tor
+    port: 9150
 
 engines:
   # Motores .onion (Red Tor) - configurados para usar proxy searvga_tor
