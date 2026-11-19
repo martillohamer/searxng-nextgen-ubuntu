@@ -50,3 +50,23 @@ services:
       driver: "none"
     depends_on:
       - core
+  inspector:
+    image: python:3.12-slim
+    container_name: searvga_inspector
+    restart: unless-stopped
+    command: >
+      sh -c "pip install --no-cache-dir fastapi uvicorn 'httpx[socks]' pypdf Pillow exifread &&
+             uvicorn searvga_inspector:app --host 0.0.0.0 --port 8081"
+    working_dir: /tmp
+    environment:
+      - TOR_PROXY=socks5h://searvga_tor:9150
+      - PIP_NO_CACHE_DIR=1
+    volumes:
+      - ./searvga_inspector.py:/tmp/searvga_inspector.py:ro
+    tmpfs:
+      - /tmp:size=128M,noexec,nosuid,nodev
+    mem_limit: 256m
+    logging:
+      driver: "none"
+    depends_on:
+      - tor
