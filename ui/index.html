@@ -192,7 +192,10 @@ function run(q,page,append){
   status(true,"ESCANEANDO",null,null);
   try{history.replaceState(null,"","?q="+encodeURIComponent(q)+"&c="+state.cat)}catch(e){}
   var t0=performance.now();
-  var url=API+"?q="+encodeURIComponent(q)+"&format=json&categories="+state.cat+"&pageno="+page+"&language=es-ES";
+  var isOnion=state.cat==="onions";
+  var qEff=isOnion&&q.indexOf(".onion")===-1?(q+" .onion"):q;
+  var engParam=isOnion?"&engines=duckduckgo,mojeek":"";
+  var url=API+"?q="+encodeURIComponent(qEff)+"&format=json&categories="+state.cat+"&pageno="+page+"&language=es-ES"+engParam;
   fetch(url,{headers:{Accept:"application/json"}})
   .then(function(r){
     if(!r.ok){var e=new Error("HTTP "+r.status);e.code=r.status;throw e}
@@ -212,7 +215,8 @@ function run(q,page,append){
 }
 
 function render(d,append,ms){
-  var out=$("out"),list=d.results||[],isImg=state.cat==="images";
+  var out=$("out"),rawList=d.results||[],isImg=state.cat==="images",isOnion=state.cat==="onions";
+  var list=isOnion?rawList.filter(function(r){var u=(r&&r.url)||"";return u.indexOf(".onion")!==-1;}):rawList;
   if(!append)out.textContent="";
   var old=out.querySelector(".more");if(old)old.remove();
 
@@ -229,7 +233,7 @@ function render(d,append,ms){
     }
   }
   if(!list.length&&!append){
-    out.appendChild(h("div","msg","> SIN COINCIDENCIAS. PRUEBA OTRA CONSULTA."));
+    out.appendChild(h("div","msg",isOnion?"> SIN ENLACES .ONION EN ESTA BUSQUEDA. PRUEBA OTRO TERMINO.":"> SIN COINCIDENCIAS. PRUEBA OTRA CONSULTA."));
     status(true,"EN LINEA",ms,0);return;
   }
 
