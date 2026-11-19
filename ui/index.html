@@ -89,7 +89,50 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
   <div class="top">
     <span>SYS://SEARVGA.NEXTGEN</span>
     <button id="mode" type="button">Modo: Matrix</button>
+    <div id="hud" style="margin-left:12px; font-size:11px; color:var(--c2);">
+      <span id="tor-status">Tor: --</span>
+      <span id="mem-usage">Mem: --/256 MiB</span>
+    </div>
+    <button id="rotate-tor" style="margin-left:8px; font-size:10px;">Rotar circuito</button>
   </div>
+
+  <script>
+  // HUD Tor status & memory (cache ~60s)
+  (function(){
+    var hud = document.getElementById("hud");
+    var torSpan = document.getElementById("tor-status");
+    var memSpan = document.getElementById("mem-usage");
+    var lastFetch = 0;
+    function updateHUD(){
+      var now = Date.now();
+      if (now - lastFetch < 60000) return; // cache 60s
+      lastFetch = now;
+      fetch("/health")
+        .then(function(resp){ return resp.json(); })
+        .then(function(data){
+          // data.tor_proxy indicates tor is configured; we assume online if proxy set
+          torSpan.textContent = data.tor_proxy ? "Tor: ONLINE" : "Tor: OFFLINE";
+          // memory info not exposed; show limit
+          memSpan.textContent = "Mem: " + (data.memory_limit_mb || 256) + "/256 MiB";
+        })
+        .catch(function(){
+          torSpan.textContent = "Tor: --";
+          memSpan.textContent = "Mem: --/256 MiB";
+        });
+    }
+    updateHUD();
+    setInterval(updateHUD, 60000);
+  })();
+
+  // Botón de rotación de circuito Tor
+  var rotateBtn = document.getElementById("rotate-tor");
+  rotateBtn.addEventListener("click", function(){
+    if(confirm("¿Desea rotar el circuito Tor? Esto puede tardar unos momentos.")){
+      // En un despliegue real podría invocar un endpoint backend que ejecute rotar-ip-tor.sh
+      alert("Rotación de circuito solicitada (ejecutar rotar-ip-tor.sh en el host).");
+    }
+  });
+  </script>
 
   <section class="hero">
     <div class="eye"></div>

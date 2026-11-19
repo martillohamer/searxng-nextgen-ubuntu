@@ -7,6 +7,8 @@ Todo el tráfico through searvga_tor (socks5h://)
 """
 
 import os
+import socket
+import ipaddress
 import io
 import json
 import hashlib
@@ -23,7 +25,8 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import JSONResponse
 
 # Configuración de memoria y límites
-MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB máximo
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "8"))
+MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024  # Límite seguro en RAM para 256 MiB
 MAX_MEMORY_MB = 256
 TOR_PROXY = os.getenv("TOR_PROXY", "socks5h://searvga_tor:9150")  # a través de searvga_tor
 
@@ -76,6 +79,68 @@ PRIMARY_IPV4_NETworks = [
 
 
 # Creación de la app FastAPI
+import html
+import re
+
+
+def _extract_html_meta(raw_bytes: bytes) -> Dict[str, Any]:
+    """Extrae título y meta descripción básicos de un HTML en memoria."""
+    text = raw_bytes[:262144].decode("utf-8", errors="replace")
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", text, flags=re.IGNORECASE | re.DOTALL)
+    title = html.unescape(re.sub(r"\s+", " ", title_match.group(1))).strip() if title_match else None
+
+    desc = None
+    for m in re.finditer(r"<meta\b([^>]*)>", text, flags=re.IGNORECASE):
+        attrs = m.group(1)
+        if re.search(r"""\bname\s*=\s*["']?description["']?""", attrs, flags=re.IGNORECASE):
+            cm = re.search(r"""\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')""", attrs, flags=re.IGNORECASE)
+            if cm:
+                val = cm.group(1) if cm.group(1) is not None else cm.group(2)
+                desc = html.unescape(re.sub(r"\s+", " ", val)).strip()
+                break
+
+    return {
+        "titulo": title or None,
+        "meta_descripcion": desc or None,
+    }
+
+
+def _detectar_tipo_contenido(url: str, content_type: str, content: bytes) -> str:
+    """Detecta tipo de archivo usando Content-Type, firma de bytes y URL."""
+    ct = (content_type or "").split(";", 1)[0].strip().lower()
+    head = content[:32]
+    lower_url = url.lower().split("?", 1)[0]
+
+    if head.startswith(b"%PDF-") or ct == "application/pdf" or lower_url.endswith(".pdf"):
+        return "pdf"
+
+    is_img_bytes = (
+        head.startswith(b"\xff\xd8\xff")
+        or head.startswith(b"\x89PNG\r\n\x1a\n")
+        or head.startswith((b"GIF87a", b"GIF89a"))
+        or (head.startswith(b"RIFF") and content[8:12] == b"WEBP")
+    )
+    if ct.startswith("image/") or is_img_bytes or any(
+        lower_url.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".tiff", ".bmp")
+    ):
+        return "imagen"
+
+    sample_low = content[:4096].decode("utf-8", errors="ignore").lstrip().lower()
+    if ct == "text/html" or sample_low.startswith(("<!doctype html", "<html", "<head", "<body")) or "<title" in sample_low[:512]:
+        return "html"
+
+    if ct.startswith("text/") or lower_url.endswith((".txt", ".md", ".csv", ".json", ".xml", ".log")):
+        return "texto"
+
+    if content and b"\x00" not in content[:4096]:
+        sample_txt = content[:2048].decode("utf-8", errors="ignore")
+        printable = sum(1 for ch in sample_txt if ch.isprintable() or ch in "\r\n\t")
+        if sample_txt and (printable / len(sample_txt)) > 0.95:
+            return "texto"
+
+    return "binario"
+
+
 app = FastAPI(
     title="searvga_inspector",
     description="Microservicio forense de inspección de metadatos en sandbox RAM",
@@ -85,7 +150,7 @@ app = FastAPI(
 )
 
 
-async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> bytes:
+async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> tuple[bytes, str]:
     """
     Descarga un archivo exclusivamente a través de la red Tor, leyendo en streaming
     para no cargar todo en memoria y abortando si se supera max_size.
@@ -106,21 +171,28 @@ async def descargar_con_tor(url: str, max_size: int = MAX_FILE_SIZE) -> bytes:
         follow_redirects=True,
     ) as client:
         try:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
+            async with client.stream("GET", url, follow_redirects=True) as response:
+                response.raise_for_status()
 
-            # Descarga en streaming con control de tamaño
-            content = bytearray()
-            async for chunk in response.aiter_bytes(chunk_size=8192):
-                content.extend(chunk)
-                if len(content) > max_size:
+                cl_header = response.headers.get("content-length")
+                if cl_header and cl_header.isdigit() and int(cl_header) > max_size:
                     raise HTTPException(
-                        status_code=400,
-                        detail=f"Archivo demasiado grande: {len(content)} bytes (máx: {max_size})"
+                        status_code=413,
+                        detail=f"Archivo demasiado grande según Content-Length: {int(cl_header)} bytes (máx: {max_size})"
                     )
 
-            # Asegurar que tengamos bytes puros
-            return bytes(content)
+                # Descarga en streaming con corte inmediato al superar max_size
+                content = bytearray()
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    if len(content) + len(chunk) > max_size:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"Archivo demasiado grande: supera el límite de {max_size} bytes"
+                        )
+                    content.extend(chunk)
+
+                ct = response.headers.get("content-type", "")
+                return bytes(content), ct
         except HTTPException:
             # Volver a lanzar HTTPException (incluye los 400 de tamaño y los 403/404 etc.)
             raise
@@ -337,48 +409,52 @@ async def inspect_url(url: str = Query(..., description="URL del archivo a inspe
             raise HTTPException(status_code=400, detail="URL debe comenzar con http:// o https://")
         
         # Descargar archivo through Tor
-        content = await descargar_con_tor(url)
-        
+        content, content_type = await descargar_con_tor(url)
+
         # Calcular hash SHA-256
         sha256_hash = hashlib.sha256(content).hexdigest()
-        
+        tipo_detectado = _detectar_tipo_contenido(url, content_type, content)
+
         # Determinar tipo y extraer metadatos
         metadata = {
             "sha256": sha256_hash,
             "tamanio_bytes": len(content),
-            "tipo_archivo": "desconocido",
+            "tipo_archivo": tipo_detectado,
+            "content_type": content_type or None,
             "metadatos": {}
         }
-        
-        # Detectar tipo por extensión o contenido
-        lower_url = url.lower()
-        
-        if lower_url.endswith(".pdf"):
-            metadata["tipo_archivo"] = "pdf"
+
+        if tipo_detectado == "pdf":
             metadata["metadatos"] = extraer_metadata_pdf(content)
-        elif any(lower_url.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".tiff", ".bmp"]):
-            metadata["tipo_archivo"] = "imagen"
-            # Intentar detectar nombre desde URL
+        elif tipo_detectado == "imagen":
             import posixpath
-            filename = posixpath.basename(lower_url).split("?")[0]
+            filename = posixpath.basename(url.lower().split("?")[0])
             metadata["metadatos"] = extraer_metadata_imagen(content, filename=filename if filename else None)
-        elif lower_url.endswith(".txt") or lower_url.endswith(".md"):
-            metadata["tipo_archivo"] = "texto"
+        elif tipo_detectado == "html":
+            html_meta = _extract_html_meta(content)
             metadata["metadatos"] = {
                 "sha256": sha256_hash,
                 "tamanio_bytes": len(content),
-                "contenido_preview": content.decode("utf-8", errors="replace")[:500] if content else "",
-                "lineas": content.decode("utf-8", errors="replace").count("\n") + 1 if content else 0
+                "content_type": content_type or None,
+                **html_meta,
+            }
+        elif tipo_detectado == "texto":
+            decoded = content.decode("utf-8", errors="replace") if content else ""
+            metadata["metadatos"] = {
+                "sha256": sha256_hash,
+                "tamanio_bytes": len(content),
+                "content_type": content_type or None,
+                "contenido_preview": decoded[:500],
+                "lineas": decoded.count("\n") + 1 if content else 0,
             }
         else:
-            # Intentar detección mime-type básica
-            metadata["tipo_archivo"] = "binario"
             metadata["metadatos"] = {
                 "sha256": sha256_hash,
                 "tamanio_bytes": len(content),
-                "nota": "Tipo no identificado específicamente, hash calculado correctamente"
+                "content_type": content_type or None,
+                "nota": "Tipo no identificado específicamente, hash calculado correctamente",
             }
-        
+
         # Asegurar que el hash siempre esté en el resultado principal
         if "sha256" not in metadata["metadatos"]:
             metadata["metadatos"]["sha256"] = sha256_hash
