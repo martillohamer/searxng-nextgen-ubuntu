@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 cd "$(dirname "$0")"
 
 echo "[1/4] Verificando motor Docker en WSL..."
 if ! docker info >/dev/null 2>&1; then
-    echo "      -> Arrancando servicio Docker..."
-    sudo service docker start >/dev/null 2>&1 || true
-    sleep 3
+    echo "      -> Esperando a que Docker termine de arrancar..."
+    for i in {1..10}; do
+        docker info >/dev/null 2>&1 && break
+        sleep 1
+    done
 fi
 
 echo "[2/4] Levantando bunker SearVGA (UI + Core + Tor RAM)..."
-docker compose up -d
+if docker compose version >/dev/null 2>&1; then
+    docker compose up -d
+elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose up -d
+else
+    echo "[ERROR] No se encontro 'docker compose' ni 'docker-compose' en WSL."
+    exit 1
+fi
 
 echo "[3/4] Esperando circuito Tor (healthy)..."
 for i in {1..30}; do
