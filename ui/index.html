@@ -140,7 +140,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
     <div class="sub">NEURAL SEARCH CORE // PRIVADO</div>
     <form class="box" id="f" autocomplete="off">
       <span class="pr">></span>
-      <input id="q" type="text" placeholder="introduce consulta..." autofocus spellcheck="false">
+      <input id="q" name="q" type="text" placeholder="introduce consulta..." autofocus spellcheck="false">
       <button class="go" type="submit">Ejecutar</button>
     </form>
     
@@ -157,6 +157,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
     </div>
     
     <div class="cats" id="cats"></div>
+    <div class="sug" id="sug"></div>
   </section>
 
   <main id="out"></main>
@@ -228,7 +229,14 @@ CATS.forEach(function(c){
   $("cats").appendChild(b);
 });
 
+var reqSeq=0,activeCtrl=null;
 function run(q,page,append){
+  // Una sola búsqueda activa: descarta respuestas obsoletas para que un clic
+  // rápido en categorías/dorks no sobrescriba los resultados más recientes.
+  var seq=++reqSeq;
+  if(activeCtrl){try{activeCtrl.abort()}catch(e){}}
+  var ctrl=("AbortController" in window)?new AbortController():null;
+  activeCtrl=ctrl;
   state.q=q;state.page=page;
   $("app").classList.add("has-results");
   var out=$("out");
@@ -237,16 +245,24 @@ function run(q,page,append){
   try{history.replaceState(null,"","?q="+encodeURIComponent(q)+"&c="+state.cat)}catch(e){}
   var t0=performance.now();
   var isOnion=state.cat==="onions";
-  var qEff=isOnion&&q.indexOf(".onion")===-1?(q+" .onion"):q;
-  var engParam=isOnion?"&engines=duckduckgo,mojeek":"";
+  var qClean=isOnion?q.replace(/\bsite:\S+|\bOR\b/gi,"").replace(/\s+/g," ").trim():q;
+  var qEff=qClean||q;
+  var engParam=isOnion?"&engines=ahmia":"";
   var url=API+"?q="+encodeURIComponent(qEff)+"&format=json&categories="+state.cat+"&pageno="+page+"&language=es-ES"+engParam;
-  fetch(url,{headers:{Accept:"application/json"}})
+  var opts={headers:{Accept:"application/json"}};
+  if(ctrl)opts.signal=ctrl.signal;
+  fetch(url,opts)
   .then(function(r){
+    if(seq!==reqSeq)return null;
     if(!r.ok){var e=new Error("HTTP "+r.status);e.code=r.status;throw e}
     return r.json();
   })
-  .then(function(d){render(d,append,performance.now()-t0)})
+  .then(function(d){
+    if(seq!==reqSeq||!d)return;
+    render(d,append,performance.now()-t0);
+  })
   .catch(function(e){
+    if(seq!==reqSeq||(e&&e.name==="AbortError"))return;
     out.textContent="";
     var m=h("div","msg");
     var b=h("b",null,"ERROR DE ENLACE: "+e.message);m.appendChild(b);
@@ -269,7 +285,7 @@ function render(d,append,ms){
       var t=typeof a==="string"?a:(a&&a.answer)||"";if(t)out.appendChild(h("div","ans","[RESPUESTA DIRECTA] "+t));
     });
     var sg=$("sug");if(sg)sg.textContent="";
-    if((d.suggestions||[]).length){
+    if(sg&&(d.suggestions||[]).length){
       sg.appendChild(document.createTextNode("QUISISTE DECIR:"));
       d.suggestions.slice(0,5).forEach(function(s){
         var a=h("a",null,s);a.onclick=function(){$("q").value=s;run(s,1,false)};sg.appendChild(a);
@@ -301,7 +317,8 @@ function render(d,append,ms){
       im.alt = r.title || "";
       a.appendChild(im);
       // handler de clic para inspección de metadatos (FASE 3)
-      a.onclick = function(){
+      a.onclick = function(ev){
+        ev.preventDefault();
         var url = a.href;
         fetch("/inspect?url=" + encodeURIComponent(url))
           .then(r => {
@@ -312,12 +329,8 @@ function render(d,append,ms){
             return r.json();
           })
           .then(data => showInspectModal(data, url))
-          .catch(e => {
-            // Mostrar mensaje claro en la interfaz (evitar que caiga a consola)
-            var out = $("out");
-            out.textContent = "";
-            var m = h("div", "msg", "ERROR DE INSPECCIÓN: " + (e.message || e));
-            out.appendChild(m);
+          .catch(function(e){
+            showInspectError(e);
             console.error("Inspección fallida:", e);
           });
       };
@@ -345,12 +358,8 @@ function render(d,append,ms){
             return r.json();
           })
           .then(data=>showInspectModal(data, url))
-          .catch(e => {
-            // Mostrar mensaje claro en la interfaz
-            var out = $("out");
-            out.textContent = "";
-            var m = h("div", "msg", "ERROR DE INSPECCIÓN: " + (e.message || e));
-            out.appendChild(m);
+          .catch(function(e){
+            showInspectError(e);
             console.error("Inspección fallida:", e);
           });
       };
@@ -370,6 +379,16 @@ function render(d,append,ms){
   status(true,"EN LINEA",ms,total);
   var mb=h("button","more","Cargar mas >>");mb.type="button";
   mb.onclick=function(){run(state.q,state.page+1,true)};out.appendChild(mb);
+}
+
+// Mostrar errores de inspección sin borrar los resultados ya renderizados
+function showInspectError(e){
+  var msg="ERROR DE INSPECCIÓN: "+((e&&e.message)?e.message:e);
+  var old=$("inspect-error");if(old)old.remove();
+  var out=$("out");
+  if(!out){alert(msg);return;}
+  var box=h("div","msg",msg);box.id="inspect-error";box.style.marginTop="10px";
+  out.insertBefore(box,out.firstChild);
 }
 
 // FASE 3: Modal de inspección de metadatos
@@ -488,7 +507,7 @@ document.body.removeChild(e);
 setTimeout(function(){ URL.revokeObjectURL(blobUrl); }, 1000);
 }
 
-// Inicialización de botones de categoría y ONION
+// Sincroniza categorías y botón ONION con el estado
 function updateUIState(){
   document.querySelectorAll("#cats .chip").forEach(function(x){
     x.classList.toggle("on", state.cat === x.dataset.c);
@@ -497,15 +516,6 @@ function updateUIState(){
     x.classList.toggle("onion-on", state.cat === "onions");
   });
 }
-
-// Handler para categorías
-document.querySelectorAll("#cats .chip").forEach(function(btn){
-  btn.onclick = function(){
-    state.cat = btn.dataset.c;
-    updateUIState();
-    if(state.q) run(state.q, 1, false);
-  };
-});
 
 // Handler para botones dorks y ONION
 document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
@@ -523,6 +533,28 @@ document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
     q.value = q.value.trim() ? (q.value.trim() + " " + dork) : dork;
     q.focus();
   };
+});
+
+// Handler para envío del formulario principal
+var formEl = $("f");
+if (formEl) {
+  formEl.addEventListener("submit", function(ev) {
+    ev.preventDefault();
+    var inp = $("q");
+    var q = inp ? inp.value.trim() : "";
+    if (q) {
+      run(q, 1, false);
+    } else if (inp) {
+      inp.focus();
+    }
+  });
+}
+
+// Atajo de teclado anunciado en la barra inferior: "/" enfoca la búsqueda
+addEventListener("keydown", function(ev){
+  var ae = document.activeElement;
+  var typing = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
+  if (ev.key === "/" && !typing) { ev.preventDefault(); $("q").focus(); }
 });
 
 // Inicializar estado desde URL

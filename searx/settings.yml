@@ -1,26 +1,21 @@
 use_default_settings: true
-
 server:
-  secret_key: "1cc48ea20cfc4a6daa84e545304beeb553516c8812e64c43a603af5c4b029c10"
+  secret_key: 1cc48ea20cfc4a6daa84e545304beeb553516c8812e64c43a603af5c4b029c10
   limiter: false
-  bind_address: "0.0.0.0"
+  bind_address: 0.0.0.0
   port: 8080
   debug: false
-
 search:
   safe_search: 0
   ban_time_on_fail: 5
   max_ban_time_on_fail: 60
   formats:
-    - html
-    - json
-
+  - html
+  - json
 outgoing:
-  request_timeout: 15.0
-  max_request_timeout: 30.0
+  request_timeout: 45.0
+  max_request_timeout: 120.0
   retries: 3
-  proxy:
-    - socks5h://searvga_tor:9150
   result_proxy:
     type: socks5
     address: searvga_tor
@@ -29,65 +24,65 @@ outgoing:
     type: socks5
     address: searvga_tor
     port: 9150
-
+  using_tor_proxy: true
+  proxies:
+    all://: socks5h://searvga_tor:9150
 engines:
-  # Motores .onion (Red Tor) - configurados para usar proxy searvga_tor
-  - name: ahmia
-    disabled: false
-    categories: [onions]
-    timeout: 15.0
-    # proxy: socks5h://searvga_tor:9150  # Usa el proxy global definido arriba
-
-  # Motiv profundos y repositorios científicos (OSINT Legal)
-  - name: arxiv
-    disabled: false
-    categories: [science]
-    timeout: 15.0
-
-  - name: github
-    disabled: false
-    categories: [code]
-    timeout: 15.0
-
-  - name: github_code
-    disabled: false
-    categories: [code]
-    timeout: 15.0
-
-  - name: gitlab
-    disabled: false
-    categories: [code]
-    timeout: 15.0
-
-  - name: openalex
-    disabled: false
-    categories: [science]
-    timeout: 15.0
-
-  - name: semantic_scholar
-    disabled: false
-    categories: [science]
-    timeout: 15.0
-
-  - name: annas_archive
-    disabled: false
-    categories: [files]
-    timeout: 15.0
-
-  # Motores generales existentes (mantener compatibilidad UI T-800)
-  - name: duckduckgo
-    disabled: false
-  - name: google
-    disabled: false
-  - name: bing
-    disabled: false
-  - name: brave
-    disabled: false
-  - name: qwant
-    disabled: false
-  - name: mojeek
-    disabled: false
-  - name: wikipedia
-    disabled: false
-  - name: stackoverflow
-    disabled: false
+- name: ahmia
+  disabled: false
+  categories:
+  - onions
+  timeout: 60.0
+- name: torch
+  inactive: true
+- name: arxiv
+  disabled: false
+  categories:
+  - science
+  timeout: 15.0
+- name: github
+  disabled: false
+  categories:
+  - code
+  timeout: 15.0
+- name: github_code
+  disabled: false
+  categories:
+  - code
+  timeout: 15.0
+- name: gitlab
+  disabled: false
+  categories:
+  - code
+  timeout: 15.0
+- name: openalex
+  disabled: false
+  categories:
+  - science
+  timeout: 15.0
+- name: semantic_scholar
+  disabled: false
+  categories:
+  - science
+  timeout: 15.0
+- name: annas_archive
+  disabled: false
+  categories:
+  - files
+  timeout: 15.0
+- name: duckduckgo
+  disabled: false
+- name: google
+  disabled: false
+- name: bing
+  disabled: false
+- name: brave
+  disabled: false
+- name: qwant
+  disabled: false
+- name: mojeek
+  disabled: false
+- name: wikipedia
+  disabled: false
+- name: stackoverflow
+  disabled: false

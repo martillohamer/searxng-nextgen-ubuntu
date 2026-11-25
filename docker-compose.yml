@@ -73,6 +73,9 @@ services:
     depends_on:
       - core
   inspector:
+    build:
+      context: .
+      dockerfile: Dockerfile.inspector
     image: searvga-inspector:local
     container_name: searvga_inspector
     restart: unless-stopped
