@@ -79,6 +79,29 @@ input::placeholder{color:var(--c2);opacity:.7}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.res,.img{opacity:1}}
 @media (max-width:560px){.go{display:none}.top{font-size:10px}}
 button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!important;background:rgba(255,45,32,.24)!important;box-shadow:0 0 14px rgba(255,45,32,.65)!important;text-shadow:0 0 8px #ff2d20!important}
+/* T-800 Tactical HUD: telemetria compacta, sin lluvia binaria */
+:root[data-hud="1"] #rain,:root[data-hud="1"] .crt{display:none!important}
+.hud{display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:10px 0 0;border:1px solid var(--c2);background:var(--bg)}
+:root[data-hud="1"] .hud{display:grid}
+.hud .cell{min-width:0;padding:6px 8px;background:rgba(0,0,0,.78);border-right:1px solid var(--dim)}
+.hud .cell:last-child{border-right:0}
+.hud .k{display:block;font-size:9px;letter-spacing:.14em;color:var(--c2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hud .v{display:block;font-size:12px;color:var(--c);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hud .v.err{color:#ff2d20}
+.hud .v.busy{color:#fff}
+.hud-actions{display:none;justify-content:space-between;align-items:center;gap:8px;margin-top:4px}
+:root[data-hud="1"] .hud-actions{display:flex}
+.hud-actions button{font:inherit;font-size:10px;letter-spacing:.12em;color:var(--c);background:transparent;border:1px solid var(--c2);padding:3px 8px;cursor:pointer;text-transform:uppercase}
+.hud-actions button:hover{background:var(--c);color:var(--bg)}
+.profiles{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}
+.profiles button{font:inherit;font-size:10px;letter-spacing:.12em;color:var(--c2);background:transparent;border:1px solid var(--dim);padding:4px 9px;cursor:pointer;text-transform:uppercase}
+.profiles button:hover{border-color:var(--c);color:var(--c)}
+.profiles button.on{border-color:var(--c);color:var(--bg);background:var(--c);box-shadow:0 0 12px var(--c)}
+.help{display:none;max-width:680px;margin:10px auto 0;padding:8px 12px;border:1px solid var(--dim);background:rgba(0,0,0,.8);font-size:11px;line-height:1.6;letter-spacing:.06em;color:var(--c2)}
+.help.on{display:block}
+.help b{color:var(--c)}
+:root[data-hud="1"] .hero{margin:14px 0 8px}
+@media (max-width:560px){.hud{grid-template-columns:repeat(2,minmax(0,1fr))}.hud .cell{border-bottom:1px solid var(--dim)}}
 </style>
 </head>
 <body>
@@ -88,51 +111,27 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 <div class="wrap" id="app">
   <div class="top">
     <span>SYS://SEARVGA.NEXTGEN</span>
-    <button id="mode" type="button">Modo: Matrix</button>
-    <div id="hud" style="margin-left:12px; font-size:11px; color:var(--c2);">
-      <span id="tor-status">Tor: --</span>
-      <span id="mem-usage">Mem: --/256 MiB</span>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button id="mode" type="button">Modo: Matrix</button>
+      <button id="hud-toggle" type="button" aria-pressed="false">HUD: OFF</button>
+      <button id="help-toggle" type="button" aria-expanded="false">AYUDA [?]</button>
     </div>
-    <button id="rotate-tor" style="margin-left:8px; font-size:10px;">Rotar circuito</button>
   </div>
 
-  <script>
-  // HUD Tor status & memory (cache ~60s)
-  (function(){
-    var hud = document.getElementById("hud");
-    var torSpan = document.getElementById("tor-status");
-    var memSpan = document.getElementById("mem-usage");
-    var lastFetch = 0;
-    function updateHUD(){
-      var now = Date.now();
-      if (now - lastFetch < 60000) return; // cache 60s
-      lastFetch = now;
-      fetch("/health")
-        .then(function(resp){ return resp.json(); })
-        .then(function(data){
-          // data.tor_proxy indicates tor is configured; we assume online if proxy set
-          torSpan.textContent = data.tor_proxy ? "Tor: ONLINE" : "Tor: OFFLINE";
-          // memory info not exposed; show limit
-          memSpan.textContent = "Mem: " + (data.memory_limit_mb || 256) + "/256 MiB";
-        })
-        .catch(function(){
-          torSpan.textContent = "Tor: --";
-          memSpan.textContent = "Mem: --/256 MiB";
-        });
-    }
-    updateHUD();
-    setInterval(updateHUD, 60000);
-  })();
-
-  // Botón de rotación de circuito Tor
-  var rotateBtn = document.getElementById("rotate-tor");
-  rotateBtn.addEventListener("click", function(){
-    if(confirm("¿Desea rotar el circuito Tor? Esto puede tardar unos momentos.")){
-      // En un despliegue real podría invocar un endpoint backend que ejecute rotar-ip-tor.sh
-      alert("Rotación de circuito solicitada (ejecutar rotar-ip-tor.sh en el host).");
-    }
-  });
-  </script>
+  <section class="hud" id="hud" aria-label="Telemetria T-800">
+    <div class="cell"><span class="k">ENLACE / HEALTH</span><span class="v" id="hud-health">--</span></div>
+    <div class="cell"><span class="k">API / ULTIMO CHECK</span><span class="v" id="hud-api">--</span></div>
+    <div class="cell"><span class="k">OPERACION</span><span class="v" id="hud-op">IDLE</span></div>
+    <div class="cell"><span class="k">PERFIL / TOR / MEM</span><span class="v" id="hud-meta">--</span></div>
+  </section>
+  <div class="hud-actions">
+    <span style="font-size:10px;color:var(--c2);letter-spacing:.1em">TOR ROT: ./rotar-ip-tor.sh (host)</span>
+    <button id="hud-refresh" type="button">REFRESH</button>
+  </div>
+  <div class="help" id="help">
+    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / limpiar · <b>H</b> alternar HUD · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    Rotacion de Tor: <b>./rotar-ip-tor.sh</b> en el host. La UI no expone esa accion.
+  </div>
 
   <section class="hero">
     <div class="eye"></div>
@@ -156,6 +155,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
       <button class="chip" style="font-size:11px;padding:3px 6px;margin:0 2px;" type="button" data-onion="1">[ONION]</button>
     </div>
     
+    <div class="profiles" id="profiles" aria-label="Perfiles rapidos"></div>
     <div class="cats" id="cats"></div>
     <div class="sug" id="sug"></div>
   </section>
@@ -167,7 +167,8 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
   <span><span class="dot" id="dot"></span>ENLACE: <i id="link">EN ESPERA</i></span>
   <span>LATENCIA: <i id="lat">--</i></span>
   <span>RESULTADOS: <i id="cnt">0</i></span>
-  <span>ATAJO: <i>/</i> BUSCAR</span>
+  <span>OP: <i id="op">IDLE</i></span>
+  <span>ATAJOS: <i>/</i> BUSCAR · <i>?</i> AYUDA</span>
 </div>
 
 <script>
@@ -176,7 +177,55 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 var API="/api/search";
 var CATS=[["general","General"],["images","Imagenes"],["news","Noticias"],["videos","Videos"],["it","Codigo"],["science","Ciencia"]];
 var root=document.documentElement,$=function(i){return document.getElementById(i)};
-var state={q:"",cat:"general",page:1};
+var state={q:"",cat:"general",page:1,profile:"general",profileFilter:""};
+var HUD_KEY="searvga-hud",PROFILE_FILTER="filetype:md OR filetype:pdf";
+var lastHealth=null,lastApi=null,lastHealthAt=0;
+function hudCell(id,val,cls){var e=$(id);if(!e)return;e.textContent=val;e.className="v"+(cls?" "+cls:"")}
+function setOp(txt,kind){var e=$("op");if(e)e.textContent=txt;hudCell("hud-op",txt,kind||"")}
+function stamp(d){return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())}
+function recordApi(code,ms){lastApi={code:code,ms:ms};hudCell("hud-api",code+" · "+Math.round(ms)+" ms · "+stamp(new Date()),code===200?"":"err")}
+function updateMeta(){
+  var tor=lastHealth&&lastHealth.data&&lastHealth.data.tor_proxy?"CFG":(lastHealth?"NO CFG":"--");
+  var mem=lastHealth&&lastHealth.data&&lastHealth.data.memory_limit_mb?lastHealth.data.memory_limit_mb:"--";
+  var el=$("hud-meta");if(el)el.textContent=(state.profile||"LIBRE")+" · TOR "+tor+" · LIM MEM "+mem+" MiB";
+}
+function probeHealth(){
+  var t0=performance.now();
+  fetch("/health",{cache:"no-store",headers:{Accept:"application/json"}})
+    .then(function(r){return r.json().then(function(d){return {ok:r.ok,code:r.status,data:d}})})
+    .then(function(x){
+      var ms=performance.now()-t0;lastHealth=x;lastHealthAt=Date.now();
+      hudCell("hud-health",(x.ok?"OK ":"HTTP ")+x.code+" · "+Math.round(ms)+" ms",x.ok?"":"err");
+      updateMeta();
+    })
+    .catch(function(e){hudCell("hud-health","ERROR "+(e&&e.message?e.message:""),"err");updateMeta()});
+}
+function probeApi(){
+  var t0=performance.now(),ctrl=("AbortController" in window)?new AbortController():null;
+  var opts={cache:"no-store",headers:{Accept:"application/json"}};
+  if(ctrl){opts.signal=ctrl.signal;setTimeout(function(){try{ctrl.abort()}catch(e){}},20000)}
+  setOp("CHECK API","busy");
+  fetch(API+"?q=Java&format=json&categories=general",opts)
+    .then(function(r){recordApi(r.status,performance.now()-t0);return r.json().catch(function(){return null})})
+    .then(function(){setOp(lastApi&&lastApi.code===200?"OK":"ERROR",lastApi&&lastApi.code===200?"ok":"err")})
+    .catch(function(){recordApi(0,performance.now()-t0);setOp("ERROR","err")});
+}
+function refreshTelemetry(){probeHealth();probeApi()}
+var helpBox=$("help"),helpBtn=$("help-toggle");
+function setHelp(on){if(helpBox)helpBox.classList.toggle("on",on);if(helpBtn)helpBtn.setAttribute("aria-expanded",on?"true":"false")}
+if(helpBtn)helpBtn.onclick=function(){setHelp(!helpBox.classList.contains("on"))};
+function setHud(on){
+  root.setAttribute("data-hud",on?"1":"0");
+  var b=$("hud-toggle");if(b){b.textContent="HUD: "+(on?"ON":"OFF");b.setAttribute("aria-pressed",on?"true":"false")}
+  try{localStorage.setItem(HUD_KEY,on?"1":"0")}catch(e){}
+  if(on)refreshTelemetry();
+}
+if($("hud-toggle"))$("hud-toggle").onclick=function(){setHud(root.getAttribute("data-hud")!=="1")};
+try{if(localStorage.getItem(HUD_KEY)==="1")root.setAttribute("data-hud","1")}catch(e){}
+if($("hud-toggle"))$("hud-toggle").textContent="HUD: "+(root.getAttribute("data-hud")==="1"?"ON":"OFF");
+if($("hud-refresh"))$("hud-refresh").onclick=refreshTelemetry;
+setInterval(function(){if(Date.now()-lastHealthAt>60000)probeHealth()},30000);
+probeHealth();
 
 function setMode(m){
   root.setAttribute("data-mode",m);
@@ -217,16 +266,36 @@ function status(ok,msg,ms,cnt){
   $("link").textContent=msg;
   if(ms!=null)$("lat").textContent=Math.round(ms)+" ms";
   if(cnt!=null)$("cnt").textContent=cnt;
+  if(msg==="ESCANEANDO")setOp("BUSCANDO","busy");
+  else if(msg==="EN LINEA")setOp("OK","ok");
+  else if(msg==="CAIDO")setOp("ERROR","err");
 }
 
 CATS.forEach(function(c){
   var b=h("button","chip"+(c[0]==="general"?" on":""),c[1]);b.type="button";b.dataset.c=c[0];
-  b.onclick=function(){
-    state.cat=c[0];
-    updateUIState();
-    if(state.q)run(state.q,1,false);
-  };
+  b.onclick=function(){applyProfile(c[0])};
   $("cats").appendChild(b);
+});
+
+var PROFILES=[["general","GENERAL"],["onions","ONIONS/TOR"],["it","DOCS/DEV"]];
+function updateProfiles(){
+  document.querySelectorAll("#profiles button").forEach(function(x){
+    x.classList.toggle("on",state.profile===x.dataset.profile);
+  });
+}
+function applyProfile(p){
+  state.cat=p;state.profile=p;
+  state.profileFilter=(p==="it")?PROFILE_FILTER:"";
+  var inp=$("q"),base=(inp&&inp.value||"").replace(PROFILE_FILTER,"").replace(/\s+/g," ").trim();
+  if(state.profileFilter&&base.indexOf("filetype:")===-1)base=base?base+" "+state.profileFilter:state.profileFilter;
+  if(inp)inp.value=base;
+  updateUIState();updateProfiles();updateMeta();
+  if(base)run(base,1,false);
+}
+PROFILES.forEach(function(p){
+  var b=h("button",p[0]==="general"?"on":"",p[1]);b.type="button";b.dataset.profile=p[0];
+  b.onclick=function(){applyProfile(p[0])};
+  $("profiles").appendChild(b);
 });
 
 var reqSeq=0,activeCtrl=null;
@@ -247,6 +316,7 @@ function run(q,page,append){
   var isOnion=state.cat==="onions";
   var qClean=isOnion?q.replace(/\bsite:\S+|\bOR\b/gi,"").replace(/\s+/g," ").trim():q;
   var qEff=qClean||q;
+  if(state.profileFilter&&state.cat==="it"&&qEff.indexOf(state.profileFilter)===-1)qEff=qEff+" "+state.profileFilter;
   var engParam=isOnion?"&engines=ahmia":"";
   var url=API+"?q="+encodeURIComponent(qEff)+"&format=json&categories="+state.cat+"&pageno="+page+"&language=es-ES"+engParam;
   var opts={headers:{Accept:"application/json"}};
@@ -254,6 +324,7 @@ function run(q,page,append){
   fetch(url,opts)
   .then(function(r){
     if(seq!==reqSeq)return null;
+    recordApi(r.status,performance.now()-t0);
     if(!r.ok){var e=new Error("HTTP "+r.status);e.code=r.status;throw e}
     return r.json();
   })
@@ -263,6 +334,7 @@ function run(q,page,append){
   })
   .catch(function(e){
     if(seq!==reqSeq||(e&&e.name==="AbortError"))return;
+    recordApi(e&&e.code?e.code:0,performance.now()-t0);
     out.textContent="";
     var m=h("div","msg");
     var b=h("b",null,"ERROR DE ENLACE: "+e.message);m.appendChild(b);
@@ -320,6 +392,7 @@ function render(d,append,ms){
       a.onclick = function(ev){
         ev.preventDefault();
         var url = a.href;
+        setOp("INSPECCIONANDO","busy");
         fetch("/inspect?url=" + encodeURIComponent(url))
           .then(r => {
             if (!r.ok) {
@@ -328,9 +401,9 @@ function render(d,append,ms){
             }
             return r.json();
           })
-          .then(data => showInspectModal(data, url))
+          .then(function(data){showInspectModal(data,url);setOp("INSPEC OK","ok")})
           .catch(function(e){
-            showInspectError(e);
+            showInspectError(e);setOp("INSPEC ERROR","err");
             console.error("Inspección fallida:", e);
           });
       };
@@ -349,6 +422,7 @@ function render(d,append,ms){
         e.stopPropagation();
         var url = r.url || safe(r.url || r.engines?.[0] || "");
         if(!url||!/^https?:\/\//i.test(url)){alert("URL no válida para inspección");return;}
+        setOp("INSPECCIONANDO","busy");
         fetch("/inspect?url=" + encodeURIComponent(url))
           .then(r => {
             if (!r.ok) {
@@ -357,9 +431,9 @@ function render(d,append,ms){
             }
             return r.json();
           })
-          .then(data=>showInspectModal(data, url))
+          .then(function(data){showInspectModal(data,url);setOp("INSPEC OK","ok")})
           .catch(function(e){
-            showInspectError(e);
+            showInspectError(e);setOp("INSPEC ERROR","err");
             console.error("Inspección fallida:", e);
           });
       };
@@ -515,16 +589,14 @@ function updateUIState(){
   document.querySelectorAll('[data-onion="1"]').forEach(function(x){
     x.classList.toggle("onion-on", state.cat === "onions");
   });
+  updateProfiles();updateMeta();
 }
 
 // Handler para botones dorks y ONION
 document.querySelectorAll(".bar-inspector .chip").forEach(function(btn){
   btn.onclick = function(){
     if(this.dataset.onion === "1"){
-      var turningOn = state.cat !== "onions";
-      state.cat = turningOn ? "onions" : "general";
-      updateUIState();
-      if(state.q) run(state.q, 1, false);
+      applyProfile(state.cat === "onions" ? "general" : "onions");
       return;
     }
     var q = $("q");
@@ -550,11 +622,22 @@ if (formEl) {
   });
 }
 
-// Atajo de teclado anunciado en la barra inferior: "/" enfoca la búsqueda
+// Atajos discretos: / buscar, Esc cerrar/limpiar, H HUD, ? ayuda
 addEventListener("keydown", function(ev){
-  var ae = document.activeElement;
-  var typing = ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable);
-  if (ev.key === "/" && !typing) { ev.preventDefault(); $("q").focus(); }
+  var ae=document.activeElement;
+  var typing=ae&&(/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)||ae.isContentEditable);
+  var key=ev.key;
+  if(key==="/"&&!typing){ev.preventDefault();$("q").focus();return}
+  if(key==="Escape"){
+    if($("searvga-inspect-modal"))return; // el modal gestiona su propio Esc
+    if(helpBox&&helpBox.classList.contains("on")){setHelp(false);return}
+    var inp=$("q");
+    if(inp&&document.activeElement===inp&&inp.value){inp.value="";setOp("LIMPIADO");return}
+    if(inp)inp.blur();
+    return;
+  }
+  if(!typing&&(key==="h"||key==="H")){setHud(root.getAttribute("data-hud")!=="1");return}
+  if(!typing&&key==="?"){ev.preventDefault();setHelp(!helpBox.classList.contains("on"))}
 });
 
 // Inicializar estado desde URL
@@ -562,7 +645,12 @@ addEventListener("keydown", function(ev){
   var params = new URLSearchParams(window.location.search);
   var cat = params.get("c");
   var q = params.get("q");
-  if(cat){ state.cat = cat; updateUIState(); }
+  if(cat){
+    state.cat=cat;
+    state.profile=(cat==="it"?"it":(cat==="onions"?"onions":"general"));
+    state.profileFilter=(state.profile==="it")?PROFILE_FILTER:"";
+    updateUIState();updateProfiles();updateMeta();
+  }
   if(q){ $("q").value = q; run(q, 1, false); }
 })();
 
