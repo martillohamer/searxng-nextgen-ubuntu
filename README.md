@@ -1,20 +1,96 @@
 # SEARVGA // T-800
 
-Buscador privado sobre SearXNG, Tor y Nginx con searvga_inspector.
+Buscador local construido sobre SearXNG, con todo el tráfico saliente a través de Tor y un microservicio de inspección forense que trabaja solo en memoria. El stack se ejecuta con Docker Compose y publica sus puertos únicamente en `127.0.0.1`.
 
-## Servicios (4 contenedores)
-- searvga_ui (127.0.0.1:8890): interfaz T-800, Nginx y /health
-- searxng / searvga_core (127.0.0.1:8889): motor de busqueda
-- searvga_inspector (interno :8081, 256 MiB RAM): analisis por Tor en streaming y metadatos
-- searvga_tor (healthy): proxy SOCKS5 socks5h://searvga_tor:9150
+## Arquitectura
 
-## Seguridad y limites
-- read_only, cap_drop: ALL, no-new-privileges y tmpfs en rutas temporales
-- Bloqueo SSRF (400) para IPs locales/privadas/reservadas
-- Limite por defecto MAX_FILE_SIZE_MB=8 (8388608 bytes) con corte en streaming y 413
+```text
+  Navegador / curl
+         |  http://127.0.0.1:8890
+         v
+  +-------------------------------+
+  | searvga_ui (nginx:alpine)     |
+  |   /           interfaz T-800  |
+  |   /health     JSON estático   |
+  |   /api/  -------------+       |
+  |   /inspect -----+     |       |
+  +-----------------+-----+-------+
+                    |     |
+        +-----------+     +-----------+
+        v                         v
+  +----------------+        +----------------+
+  | searvga_       |        | searvga_core   |
+  | inspector      |        | SearXNG :8080  |
+  | :8081 interno  |        | 127.0.0.1:8889 |
+  | 256 MiB RAM    |        +--------+-------+
+  +--------+-------+                 |
+           |                         |
+           +------------+------------+
+                        v
+            searvga_tor:9150 (SOCKS5)
+                        v
+                     red Tor
+```
+
+SearXNG también es accesible directamente en `http://127.0.0.1:8889/`. El resto de los servicios solo se comunican dentro de la red de Docker.
+
+## Servicios
+
+| Servicio (`docker-compose.yml`) | Contenedor | Acceso | Función |
+| --- | --- | --- | --- |
+| `ui` | `searvga_ui` | `127.0.0.1:8890` | Nginx con la interfaz T-800. Sirve `/health`, invierte `/api/` hacia `core:8080` y `/inspect` hacia `inspector:8081`. |
+| `core` | `searvga_core` | `127.0.0.1:8889` | SearXNG: metabúsqueda general y categoría `onions`. Configuración montada desde `./searx`. |
+| `inspector` | `searvga_inspector` | solo interno `:8081` | FastAPI: descarga en streaming por Tor, calcula SHA-256 y extrae metadatos de html, texto, pdf, imagen y binario. Límite de 256 MiB de RAM. |
+| `tor` | `searvga_tor` | solo interno `:9150` | Proxy SOCKS5 `socks5h://searvga_tor:9150` con healthcheck y `MAX_CIRCUIT_DIRTINESS=180`. |
+
+## Seguridad y límites
+
+- Los cuatro contenedores usan `read_only`, `cap_drop: ALL` y `no-new-privileges`; las rutas temporales son `tmpfs`.
+- Solo `8890` y `8889` se publican, y ambas en `127.0.0.1`. El inspector y Tor no exponen puertos al host.
+- Nginx añade CSP, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` y `X-Frame-Options: DENY`.
+- `/inspect` rechaza con `400` las URL loopback o pertenecientes a rangos IP privados/reservados (protección SSRF).
+- Tamaño máximo de descarga: `MAX_FILE_SIZE_MB=8` (8388608 bytes) por defecto. Se comprueba `Content-Length` y se corta el streaming en cuanto se supera el límite, con respuesta `413`.
+- Los códigos remotos `401`, `403`, `404` y `429` se propagan; otros fallos HTTP o de red vía Tor se devuelven como `502`.
 
 ## Uso paso a paso
-1. Arrancar: ./iniciar-searvga.sh (levanta stack y espera :8890/health)
-2. Probar /inspect: curl -s "http://127.0.0.1:8890/inspect?url=https://example.com"
-3. Rotar IP Tor: ./rotar-ip-tor.sh
-4. Ver estado/RAM: docker compose ps && docker stats --no-stream
+
+1. Requisitos: Docker con Compose y `curl`.
+
+2. Arrancar y validar el stack:
+
+   ```bash
+   ./arrancar-searvga.sh
+   ```
+
+   El script levanta los cuatro servicios, espera a `/health`, comprueba que `/api/search` con `categories=general` devuelva `200` y muestra `docker compose ps`.
+
+3. Abrir la interfaz en <http://127.0.0.1:8890/>. SearXNG está disponible por separado en <http://127.0.0.1:8889/>.
+
+4. Comprobar los endpoints desde la terminal:
+
+   ```bash
+   curl -s http://127.0.0.1:8890/health
+   curl -s 'http://127.0.0.1:8890/api/search?q=Java&format=json&categories=general'
+   curl -s 'http://127.0.0.1:8890/api/search?q=privacy&format=json&categories=onions'
+   ```
+
+5. Inspeccionar una URL a través de Tor:
+
+   ```bash
+   curl -s 'http://127.0.0.1:8890/inspect?url=https://example.com'
+   ```
+
+6. Rotar el circuito de Tor (NEWNYM; si falla, reinicia el contenedor):
+
+   ```bash
+   ./rotar-ip-tor.sh
+   ```
+
+7. Estado y consumo: `docker compose ps` y `docker stats --no-stream`. Para detener el stack: `docker compose down`.
+
+## Notas de configuración
+
+- En `searx/settings.yml` la salida por Tor se define con `outgoing.using_tor_proxy: true` y `outgoing.proxies` con `all://: socks5h://searvga_tor:9150`. `request_timeout` es 45 s, `max_request_timeout` 120 s y el motor `ahmia` (categoría `onions`) tiene 60 s; `torch` está marcado como `inactive: true`.
+- El límite del inspector se controla con la variable `MAX_FILE_SIZE_MB` en `docker-compose.yml`; el valor por defecto es 8. Cambiarla requiere recrear el contenedor.
+- Tras modificar `searvga_inspector.py` es necesario recrear el servicio, porque no se ejecuta con `--reload`: `docker compose up -d --force-recreate inspector`.
+- Los respaldos locales en `.searvga-backups/` están excluidos en `.gitignore` y no forman parte del repositorio.
