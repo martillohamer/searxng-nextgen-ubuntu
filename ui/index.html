@@ -130,6 +130,30 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 .img:hover .xray-img,.xray-img:focus{opacity:1}
 .consenso{display:inline-block;margin-left:8px;padding:1px 5px;font-size:10px;letter-spacing:.12em;color:var(--c);border:1px solid var(--dim);white-space:nowrap}
 @media (max-width:560px){.recon-body,.recon .kv{grid-template-columns:1fr}}
+/* FASE 2: GRAFO TÁCTICO DE ENTIDADES — SVG puro, sin dependencias ni CDN */
+.grafo{display:none;margin:8px 0 0;border:1px solid var(--c2);background:rgba(0,0,0,.92);box-shadow:inset 0 0 18px var(--dim)}
+.grafo.on{display:block}
+.grafo-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:10px;letter-spacing:.16em;color:var(--c2)}
+.grafo-h b{color:var(--c);font-weight:400}
+.grafo-h .tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.grafo-filter{font-size:10px;letter-spacing:.1em;color:var(--c)}
+.grafo button{font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);background:transparent;border:1px solid var(--c2);padding:3px 8px;cursor:pointer}
+.grafo button:hover{background:var(--c);color:var(--bg)}
+.grafo svg{display:block;width:100%;height:auto;max-height:460px;background:radial-gradient(circle at 50% 50%,rgba(0,90,40,.12),transparent 70%)}
+:root[data-mode="t800"] .grafo svg{background:radial-gradient(circle at 50% 50%,rgba(140,15,8,.14),transparent 70%)}
+.grafo .e{stroke:var(--c2);fill:none}
+.grafo .e.hot{stroke:var(--c)}
+.grafo .node{cursor:pointer}
+.grafo .node circle{fill:rgba(0,0,0,.9);stroke:var(--c2);stroke-width:1.4;transition:stroke .2s,fill .2s}
+.grafo .node:hover circle,.grafo .node:focus circle{stroke:var(--c);fill:rgba(0,0,0,.95);filter:drop-shadow(0 0 6px var(--c))}
+.grafo .node.core circle{stroke:var(--c);stroke-width:2}
+.grafo .node.act circle{stroke:#ffb000;fill:rgba(255,176,0,.14)}
+.grafo .node text{fill:var(--txt);font-family:inherit;font-size:10px;text-anchor:middle;pointer-events:none;letter-spacing:.04em}
+.grafo .node.core text{fill:var(--c);font-size:12px}
+.grafo .empty{fill:var(--c2);font-family:inherit;font-size:12px;text-anchor:middle;letter-spacing:.1em}
+.grafo .legend{padding:6px 10px;border-top:1px solid var(--dim);font-size:10px;letter-spacing:.1em;color:var(--c2)}
+.res.off,.img.off{display:none!important}
+@media (max-width:560px){.grafo svg{max-height:360px}}
 </style>
 </head>
 <body>
@@ -142,6 +166,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
       <button id="mode" type="button">Modo: Matrix</button>
       <button id="hud-toggle" type="button" aria-pressed="false">HUD: OFF</button>
+      <button id="grafo-toggle" type="button" aria-pressed="false" aria-controls="grafo">GRAFO: OFF</button>
       <button id="help-toggle" type="button" aria-expanded="false">AYUDA [?]</button>
     </div>
   </div>
@@ -172,9 +197,24 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
       <div class="f full"><span class="k">DETALLE FORENSE</span><div class="kv" id="recon-meta"></div></div>
     </div>
   </section>
+
+  <!-- FASE 2: GRAFO TÁCTICO DE ENTIDADES -->
+  <section class="grafo" id="grafo" aria-label="Grafo Táctico de Entidades">
+    <div class="grafo-h">
+      <span>GRAFO TÁCTICO <b>// ENTIDADES</b></span>
+      <span class="tools">
+        <span class="grafo-filter" id="grafo-filter-label"></span>
+        <button id="grafo-clear" type="button" hidden>LIMPIAR FILTRO</button>
+        <button id="grafo-redraw" type="button">REDIBUJAR</button>
+      </span>
+    </div>
+    <svg id="grafo-svg" viewBox="0 0 760 470" role="img" aria-label="Mapa de dominios y conceptos de los resultados actuales"></svg>
+    <div class="legend">CLIC EN DOMINIO: FILTRAR RESULTADOS · CLIC EN CONCEPTO: REFINAR BÚSQUEDA · GROSOR/BRILLO = RELEVANCIA Y MOTORES</div>
+  </section>
   <div class="help" id="help">
-    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> alternar HUD · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> HUD · <b>G</b> grafo · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
     <b>[RAYOS X]</b> inspecciona un enlace bajo demanda vía Tor (máx. 8 MiB): nunca se lanza automaticamente.<br>
+    <b>GRAFO</b> mapea dominios y conceptos de los resultados actuales en SVG puro; sin librerías ni peticiones externas.<br>
     Rotacion de Tor: <b>./rotar-ip-tor.sh</b> en el host. La UI no expone esa accion.
   </div>
 
@@ -222,7 +262,8 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 var API="/api/search";
 var CATS=[["general","General"],["images","Imagenes"],["news","Noticias"],["videos","Videos"],["it","Codigo"],["science","Ciencia"]];
 var root=document.documentElement,$=function(i){return document.getElementById(i)};
-var state={q:"",cat:"general",page:1,profile:"general",profileFilter:""};
+var state={q:"",cat:"general",page:1,profile:"general",profileFilter:"",results:[],domainFilter:""};
+var grafoOn=false,GRAFO_NS="http://www.w3.org/2000/svg";
 var HUD_KEY="searvga-hud",PROFILE_FILTER="filetype:md OR filetype:pdf";
 var lastHealth=null,lastApi=null,lastHealthAt=0;
 function hudCell(id,val,cls){var e=$(id);if(!e)return;e.textContent=val;e.className="v"+(cls?" "+cls:"")}
@@ -349,6 +390,144 @@ if($("recon-copy"))$("recon-copy").onclick=function(){
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(hash).then(done).catch(function(){fallbackCopy(hash,done)});
   else fallbackCopy(hash,done);
 };
+
+// FASE 2: GRAFO TÁCTICO — análisis ligero y render SVG puro (sin librerías)
+var STOPWORDS={de:1,la:1,el:1,los:1,las:1,un:1,una:1,unos:1,unas:1,y:1,o:1,en:1,con:1,por:1,para:1,del:1,al:1,su:1,sus:1,se:1,es:1,son:1,ser:1,este:1,esta:1,estos:1,estas:1,que:1,quien:1,cual:1,cuando:1,donde:1,como:1,mas:1,"más":1,pero:1,sin:1,sobre:1,entre:1,hacia:1,desde:1,hasta:1,todo:1,toda:1,todos:1,todas:1,solo:1,tambien:1,"también":1,muy:1,puede:1,pueden:1,tiene:1,tienen:1,https:1,http:1,www:1,com:1,org:1,net:1,html:1,php:1,index:1,the:1,and:1,for:1,with:1,from:1,this:1,that:1,are:1,was:1,were:1,have:1,has:1,not:1,you:1,your:1,all:1,more:1,about:1,page:1,site:1,filetype:1};
+function hostOf(u){
+  try{return new URL(u).hostname.replace(/^www\./i,"").toLowerCase()}
+  catch(e){var m=/^https?:\/\/([^\/?#]+)/i.exec(u||"");return m?m[1].replace(/^www\./i,"").toLowerCase():""}
+}
+function grafoTokens(txt){
+  return String(txt||"").toLowerCase().replace(/[^a-z0-9áéíóúüñç]+/gi," ").split(/\s+/)
+    .filter(function(w){return w.length>=4&&!STOPWORDS[w]&&!/^\d+$/.test(w)});
+}
+function grafoStats(){
+  var doms={},cons={},qw={};
+  grafoTokens(state.q).forEach(function(w){qw[w]=1});
+  (state.results||[]).forEach(function(r){
+    var host=hostOf(r&&r.url);if(!host)return;
+    var eng=Array.isArray(r.engines)?r.engines.length:1;
+    if(!doms[host])doms[host]={label:host,n:0,eng:0,cons:{}};
+    doms[host].n++;doms[host].eng+=eng;
+    var seen={};
+    grafoTokens((r.title||"")+" "+(r.content||"")).forEach(function(w){
+      if(qw[w]||seen[w])return;seen[w]=1;
+      if(!cons[w])cons[w]={label:w,n:0,eng:0};
+      cons[w].n++;cons[w].eng+=eng;
+      doms[host].cons[w]=(doms[host].cons[w]||0)+1;
+    });
+  });
+  var domains=Object.keys(doms).map(function(k){return doms[k]}).sort(function(a,b){return (b.eng-a.eng)||(b.n-a.n)||a.label.localeCompare(b.label)}).slice(0,10);
+  var concepts=Object.keys(cons).map(function(k){return cons[k]}).sort(function(a,b){return (b.n-a.n)||(b.eng-a.eng)||a.label.localeCompare(b.label)}).slice(0,12);
+  return {domains:domains,concepts:concepts};
+}
+function svgEl(tag,attrs){
+  var e=document.createElementNS(GRAFO_NS,tag);
+  if(attrs)Object.keys(attrs).forEach(function(k){e.setAttribute(k,String(attrs[k]))});
+  return e;
+}
+function grafoEdge(svg,a,b,weight,label){
+  var w=Math.min(6,1+weight*0.28),op=Math.min(.92,.22+weight*0.045);
+  var line=svgEl("line",{x1:a.x.toFixed(1),y1:a.y.toFixed(1),x2:b.x.toFixed(1),y2:b.y.toFixed(1),
+    "stroke-width":w.toFixed(2),opacity:op.toFixed(2),class:"e"+(weight>=8?" hot":"")});
+  var t=svgEl("title");t.textContent=label;line.appendChild(t);svg.appendChild(line);
+}
+function grafoNode(svg,x,y,label,weight,kind,tip,onClick){
+  var r=kind==="core"?30:(kind==="dom"?9+Math.min(7,weight*0.9):7+Math.min(5,weight*0.6));
+  var g=svgEl("g",{class:"node "+kind,tabindex:"0",role:"button","aria-label":tip});
+  g.appendChild(svgEl("circle",{cx:x.toFixed(1),cy:y.toFixed(1),r:r.toFixed(1)}));
+  var tx=svgEl("text",{x:x.toFixed(1),y:(kind==="core"?y+4:y+r+12).toFixed(1)});
+  tx.textContent=label.length>22?label.slice(0,21)+"…":label;
+  g.appendChild(tx);
+  var title=svgEl("title");title.textContent=tip;g.appendChild(title);
+  g.addEventListener("click",onClick);
+  g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();onClick()}});
+  svg.appendChild(g);
+  return {x:x,y:y,r:r,g:g};
+}
+function drawGrafo(){
+  var svg=$("grafo-svg");if(!svg)return;
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  var st=grafoStats(),W=760,H=470,cx=W/2,cy=H/2;
+  if(!st.domains.length&&!st.concepts.length){
+    var em=svgEl("text",{x:cx,y:cy,class:"empty"});
+    em.textContent="SIN DATOS — EJECUTA UNA BÚSQUEDA PARA TRAZAR EL GRAFO";
+    svg.appendChild(em);setFilterClasses();return;
+  }
+  var core={x:cx,y:cy,r:30},dpos=[],cpos=[];
+  st.domains.forEach(function(d,i){
+    var a=-Math.PI/2+i*2*Math.PI/Math.max(st.domains.length,1);
+    dpos.push({data:d,x:cx+Math.cos(a)*190,y:cy+Math.sin(a)*118});
+  });
+  st.concepts.forEach(function(c,i){
+    var a=-Math.PI/2+i*2*Math.PI/Math.max(st.concepts.length,1)+(st.domains.length?Math.PI/st.domains.length:0);
+    cpos.push({data:c,x:cx+Math.cos(a)*330,y:cy+Math.sin(a)*185});
+  });
+  dpos.forEach(function(p){
+    grafoEdge(svg,core,p,p.data.eng,p.data.label+" · "+p.data.n+" resultado(s) · "+p.data.eng+" motor(es)");
+  });
+  cpos.forEach(function(p){
+    grafoEdge(svg,core,p,p.data.n+p.data.eng*0.2,p.data.label+" · "+p.data.n+" mencione(s)");
+  });
+  dpos.forEach(function(p){
+    Object.keys(p.data.cons).map(function(w){return {w:w,n:p.data.cons[w]}})
+      .sort(function(a,b){return b.n-a.n}).slice(0,2).forEach(function(hh){
+        var dest=null;cpos.some(function(cp){if(cp.data.label===hh.w){dest=cp;return true}return false});
+        if(dest)grafoEdge(svg,p,dest,1,"Co-ocurrencia: "+p.data.label+" / "+hh.w);
+      });
+  });
+  grafoNode(svg,core.x,core.y,state.q||"CONSULTA",0,"core","Consulta: "+(state.q||"—"),function(){clearDomainFilter()});
+  dpos.forEach(function(p){
+    var n=grafoNode(svg,p.x,p.y,p.data.label,p.data.eng,"dom",
+      p.data.label+" · "+p.data.n+" resultado(s) · "+p.data.eng+" motor(es)",
+      function(){applyDomainFilter(p.data.label)});
+    n.g.dataset.domain=p.data.label;
+  });
+  cpos.forEach(function(p){
+    grafoNode(svg,p.x,p.y,p.data.label,p.data.n,"con",
+      p.data.label+" · "+p.data.n+" mencione(s) — clic para refinar la búsqueda",
+      function(){refineWithConcept(p.data.label)});
+  });
+  setFilterClasses();
+}
+function setFilterClasses(){
+  var d=state.domainFilter;
+  document.querySelectorAll("#out .res,#out .img").forEach(function(el){el.classList.toggle("off",!!d&&el.dataset.domain!==d)});
+  document.querySelectorAll("#grafo-svg .node.dom").forEach(function(g){g.classList.toggle("act",!!d&&g.dataset.domain===d)});
+}
+function refreshFilterUI(){
+  var lab=$("grafo-filter-label"),clr=$("grafo-clear");
+  if(lab)lab.textContent=state.domainFilter?"FILTRO: "+state.domainFilter:"";
+  if(clr)clr.hidden=!state.domainFilter;
+}
+function clearDomainFilter(){
+  state.domainFilter="";setFilterClasses();refreshFilterUI();
+}
+function applyDomainFilter(domain){
+  if(!domain)return;
+  if(state.domainFilter===domain){clearDomainFilter();return}
+  state.domainFilter=domain;setFilterClasses();refreshFilterUI();
+  setOp("FILTRO: "+domain,"busy");
+}
+function refineWithConcept(term){
+  clearDomainFilter();
+  var inp=$("q"),base=String(state.q||(inp&&inp.value)||"").trim();
+  if(PROFILE_FILTER)base=base.replace(PROFILE_FILTER,"").replace(/\s+/g," ").trim();
+  if(base.toLowerCase().indexOf(term.toLowerCase())===-1)base=base?base+" "+term:term;
+  if(inp)inp.value=base;
+  run(base,1,false);
+  setOp("REFINANDO: "+term,"busy");
+}
+function setGrafoOn(on){
+  grafoOn=!!on;
+  var p=$("grafo");if(p)p.classList.toggle("on",grafoOn);
+  var b=$("grafo-toggle");if(b){b.textContent="GRAFO: "+(grafoOn?"ON":"OFF");b.setAttribute("aria-pressed",grafoOn?"true":"false")}
+  if(grafoOn)drawGrafo();
+}
+if($("grafo-toggle"))$("grafo-toggle").addEventListener("click",function(){setGrafoOn(!grafoOn)});
+if($("grafo-redraw"))$("grafo-redraw").addEventListener("click",drawGrafo);
+if($("grafo-clear"))$("grafo-clear").addEventListener("click",clearDomainFilter);
+
 function status(ok,msg,ms,cnt){
   $("dot").className="dot "+(ok?"ok":"err");
   $("link").textContent=msg;
@@ -395,6 +574,7 @@ function run(q,page,append){
   var ctrl=("AbortController" in window)?new AbortController():null;
   activeCtrl=ctrl;
   state.q=q;state.page=page;
+  if(!append){state.results=[];clearDomainFilter();if(grafoOn)drawGrafo()}
   $("app").classList.add("has-results");
   var out=$("out");
   if(!append){out.textContent="";out.appendChild(h("div","msg","> ESCANEANDO RED... ESPERA"));}
@@ -454,6 +634,7 @@ function render(d,append,ms){
   }
   if(!list.length&&!append){
     out.appendChild(h("div","msg",isOnion?"> SIN ENLACES .ONION EN ESTA BUSQUEDA. PRUEBA OTRO TERMINO.":"> SIN COINCIDENCIAS. PRUEBA OTRA CONSULTA."));
+    state.results=[];if(grafoOn)drawGrafo();
     status(true,"EN LINEA",ms,0);return;
   }
 
@@ -461,10 +642,14 @@ function render(d,append,ms){
   if(isImg){holder=out.querySelector(".grid");if(!holder){holder=h("div","grid");out.appendChild(holder)}}
   var base=out.querySelectorAll(isImg?".img":".res").length;
 
+  var shown=[];
   list.forEach(function(r,i){
+    var dom=hostOf(r.url||"");
     if(isImg){
       var src=r.thumbnail_src||r.img_src||r.thumbnail;if(!src)return;
+      shown.push(r);
       var a = h("a", "img"); // <a class="img"> wrapper
+      a.dataset.domain=dom;
       a.href = safe(r.url);
       a.target = "_blank";
       a.rel = "noopener noreferrer";
@@ -482,7 +667,8 @@ function render(d,append,ms){
       a.appendChild(xbtn);
       holder.appendChild(a);
     }else{
-      var c=h("article","res");c.style.setProperty("--i",i);
+      shown.push(r);
+      var c=h("article","res");c.style.setProperty("--i",i);c.dataset.domain=dom;
       c.appendChild(h("span","n","["+pad(base+i+1)+"]"));
       // FASE 1: Triangulación de Consenso — cuántos motores coincidieron
       if(Array.isArray(r.engines)&&r.engines.length){
@@ -509,6 +695,9 @@ function render(d,append,ms){
     }
   });
 
+  state.results=(append?state.results:[]).concat(shown);
+  if(grafoOn)drawGrafo();
+  setFilterClasses();
   var total=out.querySelectorAll(isImg?".img":".res").length;
   status(true,"EN LINEA",ms,total);
   var mb=h("button","more","Cargar mas >>");mb.type="button";
@@ -744,6 +933,7 @@ addEventListener("keydown", function(ev){
     return;
   }
   if(!typing&&(key==="h"||key==="H")){setHud(root.getAttribute("data-hud")!=="1");return}
+  if(!typing&&(key==="g"||key==="G")){setGrafoOn(!grafoOn);return}
   if(!typing&&key==="?"){ev.preventDefault();setHelp(!helpBox.classList.contains("on"))}
 });
 
