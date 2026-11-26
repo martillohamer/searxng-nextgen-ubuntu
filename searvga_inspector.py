@@ -37,6 +37,8 @@ try:
     LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "35"))
 except (TypeError, ValueError):
     LLM_TIMEOUT_S = 35.0
+# Secreto del proveedor local: solo en memoria, nunca se loguea ni se devuelve
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 
 ANALYZE_MODES = ("briefing", "guion", "angulos")
 ANALYZE_SYSTEM_PROMPTS = {
@@ -532,12 +534,29 @@ def _build_analysis_context(query, results, inspect_data, dossier_entries):
     return context
 
 
-async def _resolve_llm_model(client):
+def _llm_headers():
+    """Cabeceras opcionales de autenticación para el LLM compatible con OpenAI."""
+    return {"Authorization": "Bearer " + LLM_API_KEY} if LLM_API_KEY else {}
+
+
+def _safe_error(exc):
+    """Detalle de error sin exponer jamás la clave, aunque aparezca en la excepción."""
+    text = str(exc)
+    if LLM_API_KEY:
+        text = text.replace(LLM_API_KEY, "***")
+    return _compact(text, 200)
+
+
+async def _resolve_llm_model(client, headers):
     """Con LLM_MODEL=auto toma el primer modelo publicado por el servidor local."""
     if LLM_MODEL and LLM_MODEL.lower() != "auto":
         return LLM_MODEL
     try:
-        response = await client.get(LLM_BASE_URL + "/models", timeout=min(5.0, LLM_TIMEOUT_S))
+        response = await client.get(
+            LLM_BASE_URL + "/models",
+            headers=headers,
+            timeout=min(5.0, LLM_TIMEOUT_S),
+        )
         if response.status_code == 200:
             ids = [
                 m.get("id") for m in response.json().get("data", [])
@@ -610,12 +629,14 @@ async def analyze(payload: Dict[str, Any] = Body(...)):
         {"role": "system", "content": ANALYZE_SYSTEM_PROMPTS[mode]},
         {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
     ]
+    headers = _llm_headers()
     try:
         timeout = httpx.Timeout(LLM_TIMEOUT_S, connect=min(5.0, LLM_TIMEOUT_S))
         async with httpx.AsyncClient(timeout=timeout) as client:
-            model = await _resolve_llm_model(client)
+            model = await _resolve_llm_model(client, headers)
             response = await client.post(
                 LLM_BASE_URL + "/chat/completions",
+                headers=headers,
                 json={
                     "model": model,
                     "messages": messages,
@@ -633,7 +654,7 @@ async def analyze(payload: Dict[str, Any] = Body(...)):
         return JSONResponse(status_code=502, content={
             "ok": False,
             "error": "No se pudo contactar con el motor LLM local",
-            "detalle": _compact(str(exc), 200),
+            "detalle": _safe_error(exc),
             "mode": mode,
         })
 
