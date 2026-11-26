@@ -154,6 +154,35 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 .grafo .legend{padding:6px 10px;border-top:1px solid var(--dim);font-size:10px;letter-spacing:.1em;color:var(--c2)}
 .res.off,.img.off{display:none!important}
 @media (max-width:560px){.grafo svg{max-height:360px}}
+/* FASE 3: DOSSIER ZERO-KNOWLEDGE EN RAM — AES-GCM vía Web Crypto, sin persistencia */
+.dossier{display:none;margin:8px 0 0;border:1px solid var(--c2);background:rgba(0,0,0,.92);box-shadow:inset 0 0 18px var(--dim)}
+.dossier.on{display:block}
+.dossier-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:10px;letter-spacing:.16em;color:var(--c2)}
+.dossier-h b{color:var(--c);font-weight:400}
+.dossier button{font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);background:transparent;border:1px solid var(--c2);padding:3px 8px;cursor:pointer}
+.dossier button:hover{background:var(--c);color:var(--bg)}
+.dossier-bar,.dossier-crypto,.dossier-export{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--dim)}
+.dossier-status{font-size:10px;letter-spacing:.1em;color:var(--c);margin-right:auto}
+.dossier-status.locked{color:#ffb000}
+.dossier-note{padding:7px 10px;border-bottom:1px solid var(--dim)}
+.dossier textarea{width:100%;resize:vertical;background:rgba(0,0,0,.7);border:1px solid var(--dim);color:var(--txt);font:inherit;font-size:12px;padding:6px 8px;outline:0}
+.dossier textarea:focus{border-color:var(--c)}
+.dossier-list{max-height:280px;overflow:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.dossier-entry{position:relative;border-left:2px solid var(--dim);padding:5px 30px 6px 8px;background:rgba(0,0,0,.6)}
+.dossier-type{font-size:10px;letter-spacing:.12em;color:var(--c)}
+.dossier-time{font-size:9px;color:var(--c2);margin-left:10px}
+.dossier-title{font-size:12px;color:var(--txt);word-break:break-word;margin-top:2px}
+.dossier-url{font-size:10px;color:var(--c2);word-break:break-all}
+.dossier-del{position:absolute;right:6px;top:5px;padding:0 6px!important}
+.dossier-empty{font-size:11px;color:var(--c2);letter-spacing:.08em;padding:10px 0}
+.dossier label{font-size:9px;letter-spacing:.12em;color:var(--c2)}
+.dossier input[type=password]{background:rgba(0,0,0,.7);border:1px solid var(--dim);color:var(--c);font:inherit;font-size:12px;padding:4px 8px;outline:0;width:190px}
+.dossier input[type=password]:focus{border-color:var(--c)}
+.dossier-hint{font-size:9px;letter-spacing:.08em;color:var(--c2);margin-left:auto}
+.dossier-hint.ok{color:var(--c)}
+.dossier-hint.warn{color:#ffb000}
+.dossier-hint.err{color:#ff2d20}
+@media (max-width:560px){.dossier input[type=password]{width:140px}}
 </style>
 </head>
 <body>
@@ -180,6 +209,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
   <div class="hud-actions">
     <span style="font-size:10px;color:var(--c2);letter-spacing:.1em">TOR ROT: ./rotar-ip-tor.sh (host)</span>
     <button id="recon-toggle" type="button" aria-expanded="false" aria-controls="recon">RECON: OCULTO</button>
+    <button id="dossier-toggle" type="button" aria-expanded="false" aria-controls="dossier">DOSSIER: OCULTO</button>
     <button id="hud-refresh" type="button">REFRESH</button>
   </div>
 
@@ -211,10 +241,35 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
     <svg id="grafo-svg" viewBox="0 0 760 470" role="img" aria-label="Mapa de dominios y conceptos de los resultados actuales"></svg>
     <div class="legend">CLIC EN DOMINIO: FILTRAR RESULTADOS · CLIC EN CONCEPTO: REFINAR BÚSQUEDA · GROSOR/BRILLO = RELEVANCIA Y MOTORES</div>
   </section>
+
+  <!-- FASE 3: DOSSIER ZERO-KNOWLEDGE EN RAM -->
+  <section class="dossier" id="dossier" aria-label="Dossier Zero-Knowledge en RAM">
+    <div class="dossier-h"><span>DOSSIER <b>// RAM (AES-GCM)</b></span><button id="dossier-close" type="button">CERRAR [D]</button></div>
+    <div class="dossier-bar">
+      <span class="dossier-status" id="dossier-status">DESBLOQUEADO · 0 ENTRADA(S)</span>
+      <button id="dossier-add-results" type="button">+ RESULTADOS</button>
+      <button id="dossier-add-inspect" type="button">+ RAYOS X</button>
+      <button id="dossier-add-note" type="button">+ NOTA</button>
+    </div>
+    <div class="dossier-note"><textarea id="dossier-note-input" rows="2" placeholder="nota táctica en RAM..." spellcheck="false"></textarea></div>
+    <div class="dossier-list" id="dossier-list"></div>
+    <div class="dossier-crypto">
+      <label>FRASE / CLAVE (SOLO RAM) <input id="dossier-pass" type="password" autocomplete="off" spellcheck="false" placeholder="frase de cifrado"></label>
+      <button id="dossier-lock" type="button">BLOQUEAR</button>
+      <button id="dossier-unlock" type="button">DESBLOQUEAR</button>
+      <button id="dossier-purge" type="button">PURGAR RAM</button>
+    </div>
+    <div class="dossier-export">
+      <button id="dossier-md" type="button">EXPORTAR .MD</button>
+      <button id="dossier-json" type="button">EXPORTAR .JSON</button>
+      <span class="dossier-hint" id="dossier-hint">SIN PERSISTENCIA · SIN ENVÍO DE CLAVES</span>
+    </div>
+  </section>
   <div class="help" id="help">
-    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> HUD · <b>G</b> grafo · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> HUD · <b>G</b> grafo · <b>D</b> dossier · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
     <b>[RAYOS X]</b> inspecciona un enlace bajo demanda vía Tor (máx. 8 MiB): nunca se lanza automaticamente.<br>
     <b>GRAFO</b> mapea dominios y conceptos de los resultados actuales en SVG puro; sin librerías ni peticiones externas.<br>
+    <b>DOSSIER</b> cifra hallazgos en RAM con AES-GCM (Web Crypto). La clave vive solo en la sesión: nunca se guarda ni se envía.<br>
     Rotacion de Tor: <b>./rotar-ip-tor.sh</b> en el host. La UI no expone esa accion.
   </div>
 
@@ -262,8 +317,9 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 var API="/api/search";
 var CATS=[["general","General"],["images","Imagenes"],["news","Noticias"],["videos","Videos"],["it","Codigo"],["science","Ciencia"]];
 var root=document.documentElement,$=function(i){return document.getElementById(i)};
-var state={q:"",cat:"general",page:1,profile:"general",profileFilter:"",results:[],domainFilter:""};
+var state={q:"",cat:"general",page:1,profile:"general",profileFilter:"",results:[],domainFilter:"",dossier:[],dossierLocked:false,dossierCipher:null,lastInspect:null};
 var grafoOn=false,GRAFO_NS="http://www.w3.org/2000/svg";
+var dossierOpen=false,dossierBusy=false,cryptoPass=null;
 var HUD_KEY="searvga-hud",PROFILE_FILTER="filetype:md OR filetype:pdf";
 var lastHealth=null,lastApi=null,lastHealthAt=0;
 function hudCell(id,val,cls){var e=$(id);if(!e)return;e.textContent=val;e.className="v"+(cls?" "+cls:"")}
@@ -527,6 +583,165 @@ function setGrafoOn(on){
 if($("grafo-toggle"))$("grafo-toggle").addEventListener("click",function(){setGrafoOn(!grafoOn)});
 if($("grafo-redraw"))$("grafo-redraw").addEventListener("click",drawGrafo);
 if($("grafo-clear"))$("grafo-clear").addEventListener("click",clearDomainFilter);
+
+// FASE 3: DOSSIER ZERO-KNOWLEDGE — cifrado AES-GCM en RAM (Web Crypto API)
+function cryptoReady(){var c=window.crypto;return !!(c&&c.subtle&&c.getRandomValues)}
+function randomBytes(n){var a=new Uint8Array(n);window.crypto.getRandomValues(a);return a}
+function dossierMsg(txt,kind){var e=$("dossier-hint");if(e){e.textContent=txt;e.className="dossier-hint"+(kind?" "+kind:"")}}
+function dossierPass(){
+  var el=$("dossier-pass"),v=el?String(el.value||""):"";
+  return v||cryptoPass||"";
+}
+function dossierAdd(type,title,url,detail){
+  if(state.dossierLocked){dossierMsg("DESBLOQUEA EL DOSSIER PARA AÑADIR HALLAZGOS","err");return}
+  state.dossier.push({id:"D-"+pad(state.dossier.length+1),ts:new Date().toISOString(),type:type,title:title||"",url:url||"",detail:detail||{}});
+  renderDossier();setOp("DOSSIER +"+type,"ok");
+}
+function renderDossier(){
+  var box=$("dossier-list"),st=$("dossier-status");if(!box)return;
+  box.textContent="";
+  if(st){
+    st.textContent=(state.dossierLocked?"BLOQUEADO · AES-GCM":"DESBLOQUEADO")+" · "+state.dossier.length+" ENTRADA(S)"+(state.dossierCipher?" · CIPHERTEXT EN RAM":"");
+    st.className="dossier-status"+(state.dossierLocked?" locked":"");
+  }
+  if(state.dossierLocked){box.appendChild(h("div","dossier-empty","DOSSIER CIFRADO — DESBLOQUEA CON TU FRASE PARA VER EL CONTENIDO"));return}
+  if(!state.dossier.length){box.appendChild(h("div","dossier-empty","DOSSIER VACÍO — CAPTURA RESULTADOS, RAYOS X O NOTAS"));return}
+  state.dossier.forEach(function(e){
+    var row=h("div","dossier-entry");
+    row.appendChild(h("span","dossier-type","["+e.type+"]"));
+    row.appendChild(h("span","dossier-time",String(e.ts||"").replace("T"," ").slice(0,19)));
+    row.appendChild(h("div","dossier-title",e.title||"—"));
+    if(e.url)row.appendChild(h("div","dossier-url",e.url));
+    var del=h("button","dossier-del","×");del.type="button";del.title="Eliminar entrada";
+    del.addEventListener("click",function(){var i=state.dossier.indexOf(e);if(i!==-1)state.dossier.splice(i,1);renderDossier()});
+    row.appendChild(del);box.appendChild(row);
+  });
+}
+function dossierCaptureResults(){
+  var rows=state.results.slice(0,40).map(function(r){return {title:r.title||"",url:r.url||"",content:String(r.content||"").slice(0,300),engines:r.engines||[]}});
+  if(!rows.length){dossierMsg("SIN RESULTADOS EN MEMORIA","warn");return}
+  dossierAdd("RESULTADOS","Consulta: "+(state.q||"--"),"",{query:state.q,count:rows.length,rows:rows});
+}
+function dossierCaptureInspect(){
+  var li=state.lastInspect;
+  if(!li){dossierMsg("SIN INSPECCIÓN RECIENTE — PULSA [RAYOS X]","warn");return}
+  var d=li.data||{};
+  dossierAdd("RAYOS X",li.url||"Inspección",li.url||"",{
+    http:li.status,sha256:d.sha256||"",tipo_archivo:d.tipo_archivo||"",content_type:d.content_type||"",
+    tamanio_bytes:d.tamanio_bytes,metadatos:d.metadatos||{},alertas:li.alerts||[]
+  });
+}
+function dossierCaptureNote(){
+  var el=$("dossier-note-input"),txt=el?String(el.value||"").trim():"";
+  if(!txt){dossierMsg("ESCRIBE UNA NOTA PRIMERO","warn");return}
+  dossierAdd("NOTA",txt.slice(0,80),"",{texto:txt});
+  if(el)el.value="";
+}
+function deriveDossierKey(pass,salt){
+  var raw=new TextEncoder().encode(pass);
+  return window.crypto.subtle.importKey("raw",raw,{name:"PBKDF2"},false,["deriveKey"])
+    .then(function(base){return window.crypto.subtle.deriveKey(
+      {name:"PBKDF2",salt:salt,iterations:120000,hash:"SHA-256"},base,
+      {name:"AES-GCM",length:256},false,["encrypt","decrypt"])});
+}
+function dossierLock(){
+  if(!cryptoReady()){dossierMsg("WEB CRYPTO NO DISPONIBLE — USA LOCALHOST O HTTPS","err");return}
+  if(dossierBusy)return;
+  var pass=dossierPass();
+  if(!pass){dossierMsg("INTRODUCE UNA FRASE / CLAVE","err");return}
+  if(!state.dossier.length){dossierMsg("DOSSIER VACÍO — NADA QUE CIFRAR","warn");return}
+  dossierBusy=true;setOp("CIFRANDO RAM","busy");
+  var salt=randomBytes(16),iv=randomBytes(12);
+  var json=JSON.stringify({v:1,entries:state.dossier});
+  deriveDossierKey(pass,salt)
+    .then(function(key){return window.crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,new TextEncoder().encode(json))})
+    .then(function(buf){
+      state.dossierCipher={salt:salt,iv:iv,data:new Uint8Array(buf)};
+      state.dossier=[];
+      state.dossierLocked=true;cryptoPass=pass;
+      var pi=$("dossier-pass");if(pi)pi.value="";
+      dossierBusy=false;renderDossier();setOp("RAM CIFRADA","ok");
+      dossierMsg("AES-GCM-256 · IV Y SAL ALEATORIOS · CLAVE SOLO EN RAM","ok");
+    })
+    .catch(function(e){dossierBusy=false;dossierMsg("ERROR AL CIFRAR: "+(e&&e.message?e.message:e),"err");setOp("DOSSIER ERROR","err")});
+}
+function dossierUnlock(){
+  if(!cryptoReady()){dossierMsg("WEB CRYPTO NO DISPONIBLE — USA LOCALHOST O HTTPS","err");return}
+  if(dossierBusy)return;
+  if(!state.dossierCipher){dossierMsg("NO HAY DOSSIER CIFRADO EN RAM","warn");return}
+  var pass=dossierPass();
+  if(!pass){dossierMsg("INTRODUCE LA FRASE / CLAVE","err");return}
+  dossierBusy=true;setOp("DESCIFRANDO RAM","busy");
+  var box=state.dossierCipher;
+  deriveDossierKey(pass,box.salt)
+    .then(function(key){return window.crypto.subtle.decrypt({name:"AES-GCM",iv:box.iv},key,box.data)})
+    .then(function(buf){
+      var obj=JSON.parse(new TextDecoder().decode(buf));
+      state.dossier=Array.isArray(obj.entries)?obj.entries:[];
+      state.dossierLocked=false;state.dossierCipher=null;cryptoPass=pass;
+      var pi=$("dossier-pass");if(pi)pi.value="";
+      dossierBusy=false;renderDossier();setOp("RAM ABIERTA","ok");
+      dossierMsg("DOSSIER DESCIFRADO SOLO EN MEMORIA","ok");
+    })
+    .catch(function(){dossierBusy=false;dossierMsg("CLAVE INCORRECTA O DATOS ALTERADOS","err");setOp("DOSSIER ERROR","err")});
+}
+function dossierPurge(){
+  state.dossier=[];state.dossierCipher=null;state.dossierLocked=false;
+  cryptoPass=null;dossierBusy=false;
+  var pi=$("dossier-pass");if(pi)pi.value="";
+  var ni=$("dossier-note-input");if(ni)ni.value="";
+  renderDossier();setOp("RAM PURGADA","ok");
+  dossierMsg("MEMORIA PURGADA · SIN DISCO, LOCALSTORAGE NI ENVÍO","warn");
+}
+function dossierExport(kind){
+  if(state.dossierLocked){dossierMsg("DESBLOQUEA ANTES DE EXPORTAR","err");return}
+  if(!state.dossier.length){dossierMsg("DOSSIER VACÍO — NADA QUE EXPORTAR","warn");return}
+  var now=new Date(),tag=now.toISOString().replace(/[:.]/g,"-"),text,mime,name;
+  if(kind==="json"){
+    text=JSON.stringify({generado:now.toISOString(),consulta:state.q,entradas:state.dossier},null,2);
+    mime="application/json;charset=utf-8";name="searvga-dossier-"+tag+".json";
+  }else{
+    var md="# DOSSIER ZERO-KNOWLEDGE // SEARVGA\n\n";
+    md+="**Generado:** "+now.toISOString()+"\n**Consulta:** "+(state.q||"--")+"\n**Entradas:** "+state.dossier.length+"\n\n---\n\n";
+    state.dossier.forEach(function(e,i){
+      md+="## "+(i+1)+". ["+e.type+"] "+(e.title||"—")+"\n";
+      md+="**Fecha:** "+(e.ts||"")+"\n";
+      if(e.url)md+="**URL:** "+e.url+"\n";
+      var d=e.detail||{};
+      Object.keys(d).forEach(function(k){
+        if(k==="rows"){
+          md+="**Descargados:** "+d.rows.length+"\n";
+          d.rows.slice(0,10).forEach(function(r){md+="- "+r.title+" — "+r.url+"\n"});
+          return;
+        }
+        md+="**"+k+":** "+(d[k]&&typeof d[k]==="object"?JSON.stringify(d[k]):String(d[k]))+"\n";
+      });
+      md+="\n---\n\n";
+    });
+    md+="*Exportación local bajo demanda. Sin envío a servidor ni persistencia automática.*\n";
+    text=md;mime="text/markdown;charset=utf-8";name="searvga-dossier-"+tag+".md";
+  }
+  var blob=new Blob([text],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=name;a.style.display="none";document.body.appendChild(a);a.click();
+  document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  dossierMsg("EXPORTACIÓN LOCAL GENERADA","ok");
+}
+function setDossierOpen(on){
+  dossierOpen=!!on;
+  var p=$("dossier");if(p)p.classList.toggle("on",dossierOpen);
+  var b=$("dossier-toggle");if(b){b.textContent="DOSSIER: "+(dossierOpen?"ABIERTO":"OCULTO");b.setAttribute("aria-expanded",dossierOpen?"true":"false")}
+  if(dossierOpen)renderDossier();
+}
+if($("dossier-toggle"))$("dossier-toggle").addEventListener("click",function(){setDossierOpen(!dossierOpen)});
+if($("dossier-close"))$("dossier-close").addEventListener("click",function(){setDossierOpen(false)});
+if($("dossier-add-results"))$("dossier-add-results").addEventListener("click",dossierCaptureResults);
+if($("dossier-add-inspect"))$("dossier-add-inspect").addEventListener("click",dossierCaptureInspect);
+if($("dossier-add-note"))$("dossier-add-note").addEventListener("click",dossierCaptureNote);
+if($("dossier-lock"))$("dossier-lock").addEventListener("click",dossierLock);
+if($("dossier-unlock"))$("dossier-unlock").addEventListener("click",dossierUnlock);
+if($("dossier-purge"))$("dossier-purge").addEventListener("click",dossierPurge);
+if($("dossier-md"))$("dossier-md").addEventListener("click",function(){dossierExport("md")});
+if($("dossier-json"))$("dossier-json").addEventListener("click",function(){dossierExport("json")});
 
 function status(ok,msg,ms,cnt){
   $("dot").className="dot "+(ok?"ok":"err");
@@ -793,6 +1008,7 @@ function renderRecon(data,url,status){
   reconSet("recon-url",url||"--");
   reconSet("recon-hash",(data&&data.sha256)||"NO DISPONIBLE","hash");
   var alerts=detectAlerts(data,url,status);
+  state.lastInspect={url:url,data:data,status:status,alerts:alerts};
   if(alerts.length)alerts.forEach(function(a){reconAlert(a[0],a[1])});
   else{var box=$("recon-alerts");if(box)box.appendChild(h("span","clean","SIN METADATOS OCULTOS NI SEÑALES ADVERSAS"))}
   renderMetaDetail((data&&data.metadatos)||{});
@@ -934,6 +1150,7 @@ addEventListener("keydown", function(ev){
   }
   if(!typing&&(key==="h"||key==="H")){setHud(root.getAttribute("data-hud")!=="1");return}
   if(!typing&&(key==="g"||key==="G")){setGrafoOn(!grafoOn);return}
+  if(!typing&&(key==="d"||key==="D")){setDossierOpen(!dossierOpen);return}
   if(!typing&&key==="?"){ev.preventDefault();setHelp(!helpBox.classList.contains("on"))}
 });
 
