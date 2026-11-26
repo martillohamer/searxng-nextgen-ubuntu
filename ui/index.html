@@ -102,6 +102,34 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 .help b{color:var(--c)}
 :root[data-hud="1"] .hero{margin:14px 0 8px}
 @media (max-width:560px){.hud{grid-template-columns:repeat(2,minmax(0,1fr))}.hud .cell{border-bottom:1px solid var(--dim)}}
+/* FASE 1: HORIZONTE DE SUCESOS // RECON — HUD, alto contraste, sin lluvia binaria */
+.recon{display:none;margin:8px 0 0;border:1px solid var(--c2);background:rgba(0,0,0,.92);box-shadow:inset 0 0 18px var(--dim)}
+.recon.on{display:block}
+.recon-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:10px;letter-spacing:.16em;color:var(--c2)}
+.recon-h b{color:var(--c);font-weight:400}
+.recon-body{padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px}
+.recon .f{min-width:0}
+.recon .k{display:block;font-size:9px;letter-spacing:.14em;color:var(--c2);margin-bottom:3px}
+.recon .v{display:block;font-size:12px;color:var(--txt);word-break:break-word;line-height:1.45}
+.recon .v.err{color:#ff2d20}
+.recon .v.hash{font-size:11px;color:var(--c);word-break:break-all;font-family:inherit}
+.recon .full{grid-column:1/-1}
+.recon .alerts{display:flex;flex-direction:column;gap:5px}
+.recon .alert{border-left:2px solid #ff2d20;padding:5px 8px;font-size:11px;line-height:1.5;color:#ffcfca;background:rgba(255,45,32,.09);word-break:break-word}
+.recon .alert.warn{border-left-color:#ffb000;color:#ffe0a3;background:rgba(255,176,0,.08)}
+.recon .clean{font-size:11px;letter-spacing:.1em;color:var(--c2)}
+.recon .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 12px;font-size:11px;color:var(--txt)}
+.recon .kv b{color:var(--c2);font-weight:400;letter-spacing:.08em}
+.recon .kv span{word-break:break-word}
+.copy-row{display:flex;align-items:flex-start;gap:8px}
+.copy-row .v{flex:1}
+.recon button,.xray{font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);background:transparent;border:1px solid var(--c2);padding:3px 8px;cursor:pointer}
+.recon button:hover,.xray:hover{background:var(--c);color:var(--bg);box-shadow:0 0 12px var(--c)}
+.xray[disabled]{opacity:.45;cursor:wait;box-shadow:none;background:transparent;color:var(--c)}
+.xray-img{position:absolute;left:6px;bottom:6px;z-index:3;background:rgba(0,0,0,.85);opacity:.75}
+.img:hover .xray-img,.xray-img:focus{opacity:1}
+.consenso{display:inline-block;margin-left:8px;padding:1px 5px;font-size:10px;letter-spacing:.12em;color:var(--c);border:1px solid var(--dim);white-space:nowrap}
+@media (max-width:560px){.recon-body,.recon .kv{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -126,10 +154,27 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
   </section>
   <div class="hud-actions">
     <span style="font-size:10px;color:var(--c2);letter-spacing:.1em">TOR ROT: ./rotar-ip-tor.sh (host)</span>
+    <button id="recon-toggle" type="button" aria-expanded="false" aria-controls="recon">RECON: OCULTO</button>
     <button id="hud-refresh" type="button">REFRESH</button>
   </div>
+
+  <!-- FASE 1: HORIZONTE DE SUCESOS // RECON -->
+  <section class="recon" id="recon" aria-label="Horizonte de Sucesos // Recon">
+    <div class="recon-h"><span>HORIZONTE DE SUCESOS <b>// RECON</b></span><button id="recon-close" type="button">CERRAR [ESC]</button></div>
+    <div class="recon-body">
+      <div class="f"><span class="k">ESTADO HTTP</span><span class="v" id="recon-http">--</span></div>
+      <div class="f"><span class="k">CONTENT-TYPE (RAM)</span><span class="v" id="recon-ct">--</span></div>
+      <div class="f"><span class="k">TIPO DETECTADO</span><span class="v" id="recon-tipo">--</span></div>
+      <div class="f"><span class="k">TAMAÑO / TOPE</span><span class="v" id="recon-size">--</span></div>
+      <div class="f full"><span class="k">OBJETIVO</span><span class="v" id="recon-url">--</span></div>
+      <div class="f full"><span class="k">SHA-256</span><div class="copy-row"><span class="v hash" id="recon-hash">--</span><button id="recon-copy" type="button">COPIAR</button></div></div>
+      <div class="f full"><span class="k">ALERTAS / SEÑALES</span><div class="alerts" id="recon-alerts"><span class="clean">SIN DATOS — PULSA [RAYOS X] EN UN RESULTADO</span></div></div>
+      <div class="f full"><span class="k">DETALLE FORENSE</span><div class="kv" id="recon-meta"></div></div>
+    </div>
+  </section>
   <div class="help" id="help">
-    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / limpiar · <b>H</b> alternar HUD · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> alternar HUD · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    <b>[RAYOS X]</b> inspecciona un enlace bajo demanda vía Tor (máx. 8 MiB): nunca se lanza automaticamente.<br>
     Rotacion de Tor: <b>./rotar-ip-tor.sh</b> en el host. La UI no expone esa accion.
   </div>
 
@@ -261,6 +306,49 @@ if(!matchMedia("(prefers-reduced-motion:reduce)").matches)requestAnimationFrame(
 function h(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
 function safe(u){return /^https?:\/\//i.test(u||"")?u:"#"}
 function pad(n){return n<10?"0"+n:""+n}
+
+// FASE 1: HORIZONTE DE SUCESOS // RECON
+var INSPECT_MAX_MB=8,reconOpen=false,inspectBusy=false;
+function setReconOpen(on){
+  reconOpen=!!on;
+  var p=$("recon");if(p)p.classList.toggle("on",reconOpen);
+  var b=$("recon-toggle");if(b){b.textContent="RECON: "+(reconOpen?"ABIERTO":"OCULTO");b.setAttribute("aria-expanded",reconOpen?"true":"false")}
+}
+function reconSet(id,val,cls){
+  var e=$(id);if(!e)return;
+  e.textContent=(val==null||val==="")?"--":String(val);
+  e.className="v"+(cls?" "+cls:"");
+}
+function fmtBytes(n){
+  if(typeof n!=="number"||!isFinite(n)||n<0)return "--";
+  var h=n<1024?n+" B":(n<1048576?(n/1024).toFixed(2)+" KiB":(n/1048576).toFixed(2)+" MiB");
+  return n.toLocaleString("en-US")+" B ("+h+")";
+}
+function reconAlert(level,text){
+  var box=$("recon-alerts");if(!box)return;
+  if(box.querySelector(".clean"))box.textContent="";
+  box.appendChild(h("div","alert"+(level==="warn"?" warn":""),text));
+}
+function reconClear(){
+  ["recon-http","recon-ct","recon-tipo","recon-size","recon-url","recon-hash"].forEach(function(id){reconSet(id,"--")});
+  var a=$("recon-alerts");if(a)a.textContent="";
+  var m=$("recon-meta");if(m)m.textContent="";
+}
+function fallbackCopy(txt,cb){
+  var ta=document.createElement("textarea");ta.value=txt;ta.setAttribute("readonly","");
+  ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();
+  try{document.execCommand("copy");cb()}catch(e){}
+  document.body.removeChild(ta);
+}
+if($("recon-toggle"))$("recon-toggle").onclick=function(){setReconOpen(!reconOpen)};
+if($("recon-close"))$("recon-close").onclick=function(){setReconOpen(false)};
+if($("recon-copy"))$("recon-copy").onclick=function(){
+  var hash=$("recon-hash")?$("recon-hash").textContent:"";
+  if(!hash||hash==="--")return;
+  var done=function(){var b=$("recon-copy");if(b){b.textContent="COPIADO";setTimeout(function(){b.textContent="COPIAR"},1400)}};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(hash).then(done).catch(function(){fallbackCopy(hash,done)});
+  else fallbackCopy(hash,done);
+};
 function status(ok,msg,ms,cnt){
   $("dot").className="dot "+(ok?"ok":"err");
   $("link").textContent=msg;
@@ -388,55 +476,27 @@ function render(d,append,ms){
       im.referrerPolicy = "no-referrer";
       im.alt = r.title || "";
       a.appendChild(im);
-      // handler de clic para inspección de metadatos (FASE 3)
-      a.onclick = function(ev){
-        ev.preventDefault();
-        var url = a.href;
-        setOp("INSPECCIONANDO","busy");
-        fetch("/inspect?url=" + encodeURIComponent(url))
-          .then(r => {
-            if (!r.ok) {
-              // intentar leer detail/mensaje del JSON de error
-              return r.json().then(j => { throw new Error(j.detail || j.message || `HTTP ${r.status}`); });
-            }
-            return r.json();
-          })
-          .then(function(data){showInspectModal(data,url);setOp("INSPEC OK","ok")})
-          .catch(function(e){
-            showInspectError(e);setOp("INSPEC ERROR","err");
-            console.error("Inspección fallida:", e);
-          });
-      };
+      // FASE 1: Rayos X bajo demanda; la miniatura abre el enlace con normalidad
+      var xbtn=h("button","xray xray-img","[RAYOS X]");xbtn.type="button";xbtn.title="Inspeccionar enlace vía Tor (máx. 8 MiB)";
+      xbtn.onclick=function(ev){ev.preventDefault();ev.stopPropagation();doInspect(r.url||"",xbtn)};
+      a.appendChild(xbtn);
       holder.appendChild(a);
     }else{
       var c=h("article","res");c.style.setProperty("--i",i);
       c.appendChild(h("span","n","["+pad(base+i+1)+"]"));
+      // FASE 1: Triangulación de Consenso — cuántos motores coincidieron
+      if(Array.isArray(r.engines)&&r.engines.length){
+        c.appendChild(h("span","consenso","["+r.engines.length+(r.engines.length===1?" MOTOR":" MOTORES")+"]"));
+      }
       var t=h("a","t",r.title||r.url);t.href=safe(r.url);t.target="_blank";t.rel="noopener noreferrer";c.appendChild(t);
       c.appendChild(h("div","u",r.url||""));
       if(r.content)c.appendChild(h("div","s",r.content));
       var e=h("div","eng");(r.engines||[]).forEach(function(n){e.appendChild(h("span",null,n))});c.appendChild(e);
-      // FASE 3: Agregar botón de inspección de metadatos
-      var inspectBtn = h("button","inspect-btn","INSPECCIONAR");
-      inspectBtn.style.marginLeft="8px";inspectBtn.style.fontSize="10px";inspectBtn.title="Inspeccionar metadatos";
-      inspectBtn.onclick=function(e){
-        e.stopPropagation();
-        var url = r.url || safe(r.url || r.engines?.[0] || "");
-        if(!url||!/^https?:\/\//i.test(url)){alert("URL no válida para inspección");return;}
-        setOp("INSPECCIONANDO","busy");
-        fetch("/inspect?url=" + encodeURIComponent(url))
-          .then(r => {
-            if (!r.ok) {
-              // intentar extraer detail/mensaje del error JSON
-              return r.json().then(j => { throw new Error(j.detail || j.message || `HTTP ${r.status}`); });
-            }
-            return r.json();
-          })
-          .then(function(data){showInspectModal(data,url);setOp("INSPEC OK","ok")})
-          .catch(function(e){
-            showInspectError(e);setOp("INSPEC ERROR","err");
-            console.error("Inspección fallida:", e);
-          });
-      };
+      // FASE 1: botón táctico [RAYOS X], inspección siempre bajo demanda
+      var inspectBtn=h("button","xray","[RAYOS X]");
+      inspectBtn.type="button";inspectBtn.title="Inspección forense vía Tor (máx. 8 MiB)";
+      inspectBtn.style.marginLeft="8px";
+      inspectBtn.onclick=function(ev){ev.stopPropagation();doInspect(r.url||"",inspectBtn)};
       c.appendChild(inspectBtn);
       // FASE 3: Botón de exportar informe .MD
       var exportBtn = h("button","export-btn","EXPORTAR .MD");
@@ -455,85 +515,132 @@ function render(d,append,ms){
   mb.onclick=function(){run(state.q,state.page+1,true)};out.appendChild(mb);
 }
 
-// Mostrar errores de inspección sin borrar los resultados ya renderizados
+// Mostrar errores de inspección en el panel RECON, sin borrar los resultados
 function showInspectError(e){
-  var msg="ERROR DE INSPECCIÓN: "+((e&&e.message)?e.message:e);
-  var old=$("inspect-error");if(old)old.remove();
-  var out=$("out");
-  if(!out){alert(msg);return;}
-  var box=h("div","msg",msg);box.id="inspect-error";box.style.marginTop="10px";
-  out.insertBefore(box,out.firstChild);
+  var code=(e&&e.code)?e.code:0;
+  var msg=(e&&e.message)?e.message:String(e);
+  reconClear();
+  reconSet("recon-http",code?"HTTP "+code+" · SIN RESPUESTA":"SIN RESPUESTA","err");
+  reconAlert("alert","ERROR DE INSPECCIÓN: "+msg);
+  setReconOpen(true);
+  setOp("RECON ERROR","err");
+  console.error("Inspección fallida:",e);
 }
 
-// FASE 3: Modal de inspección de metadatos
-function showInspectModal(data, url){
-if(!data){alert("No se pudieron extraer metadatos");return;}
-var prev = document.getElementById("searvga-inspect-modal");
-if(prev) prev.remove();
-
-var modal = document.createElement("div");
-modal.id = "searvga-inspect-modal";
-modal.style.position="fixed";
-modal.style.zIndex="1000";
-modal.style.left="0";modal.style.top="0";modal.style.width="100%";modal.style.height="100%";
-modal.style.background="rgba(0,0,0,.9)";modal.style.color="#fff";
-modal.style.padding="20px";modal.style.overflowY="auto";
-modal.style.fontFamily="'Share Tech Mono','JetBrains Mono',sans-serif";
-
-function cleanup(){
-document.removeEventListener("keydown", onKey);
-if(modal.parentNode) modal.remove();
+// FASE 1: detección de metadatos ocultos y señales de redirección
+function detectAlerts(data,url,status){
+  var out=[],m=(data&&data.metadatos&&typeof data.metadatos==="object")?data.metadatos:{};
+  var tipo=(data&&data.tipo_archivo)||"";
+  if(status&&status>=400)out.push(["alert","ESTADO HTTP "+status+" DEL INSPECTOR"]);
+  var size=data&&data.tamanio_bytes;
+  if(typeof size==="number"&&size>INSPECT_MAX_MB*1048576)out.push(["alert","TOPE DE "+INSPECT_MAX_MB+" MiB EXCEDIDO"]);
+  // El inspector sigue redirecciones; si expone la cadena se analiza, si no se
+  // usan las señales disponibles (http sin cifrar / discrepancia MIME).
+  var hops=data&&(data.redirecciones||data.redirects||data.redirect_chain);
+  if(Array.isArray(hops)&&hops.length){
+    out.push(["warn","CADENA DE REDIRECCIÓN: "+hops.length+" salto(s)"]);
+    var prev=url;
+    hops.forEach(function(x){
+      var hu=typeof x==="string"?x:((x&&(x.url||x.location||x.destino))||"");
+      if(!/^https?:\/\//i.test(hu))return;
+      try{
+        var a=new URL(prev),b=new URL(hu);
+        if(a.origin!==b.origin)out.push(["alert","CAMBIO DE ORIGEN: "+a.host+" → "+b.host]);
+        else if(a.protocol!==b.protocol)out.push(["warn","CAMBIO DE PROTOCOLO: "+a.protocol+" → "+b.protocol]);
+      }catch(err){}
+      prev=hu;
+    });
+  }else if(/^http:\/\//i.test(url||"")){
+    out.push(["warn","OBJETIVO SIN CIFRAR (http://) — POSIBLE REDIRECCIÓN INSEGURA"]);
+  }
+  var ct=((data&&data.content_type)||"").toLowerCase();
+  if(ct&&tipo&&((ct.indexOf("image/")===0&&tipo!=="imagen")||(ct.indexOf("pdf")!==-1&&tipo!=="pdf")||(ct.indexOf("html")!==-1&&tipo!=="html"))){
+    out.push(["warn","CABECERA MIME DISCREPANTE: '"+data.content_type+"' vs '"+tipo+"'"]);
+  }
+  var gps=m.gps||m.GPS;
+  if(gps&&typeof gps==="object"){
+    var lat=gps.latitud!=null?gps.latitud:gps.lat;
+    var lon=gps.longitud!=null?gps.longitud:(gps.lon!=null?gps.lon:gps.lng);
+    out.push(["alert","GEOLOCALIZACIÓN GPS EXPUESTA: "+lat+", "+lon]);
+  }
+  var hidden=[];
+  ["autor","Author","creador","software","fecha","fecha_creacion","fecha_modificacion"].forEach(function(k){
+    if(m[k]!=null&&m[k]!=="")hidden.push(k+": "+m[k]);
+  });
+  if(m.metadatos_adicionales&&Object.keys(m.metadatos_adicionales).length){
+    hidden.push("metadatos_adicionales: "+Object.keys(m.metadatos_adicionales).length+" campo(s)");
+  }
+  if(hidden.length){
+    out.push(["alert",(tipo==="pdf"?"METADATOS PDF OCULTOS":"METADATOS EXIF OCULTOS")+" — "+hidden.join(" · ")]);
+  }
+  if(m.error)out.push(["warn","EXTRACCIÓN PARCIAL: "+m.error]);
+  return out;
 }
-function onKey(ev){
-if(ev.key === "Escape") cleanup();
+
+function renderMetaDetail(m){
+  var box=$("recon-meta");if(!box)return;box.textContent="";
+  var map=[["autor","AUTOR"],["creador","CREADOR"],["software","SOFTWARE"],["formato","FORMATO"],["dimensiones","DIMENSIONES"],["fecha","FECHA EXIF"],["fecha_creacion","CREACIÓN PDF"],["fecha_modificacion","MODIFICACIÓN PDF"],["titulo","TÍTULO"],["meta_descripcion","DESCRIPCIÓN"],["lineas","LÍNEAS"],["nota","NOTA"],["error","ERROR"],["filename","ARCHIVO"]];
+  var any=false;
+  map.forEach(function(p){
+    var v=m[p[0]];if(v==null||v==="")return;
+    var s=h("span");s.appendChild(h("b",null,p[1]+": "));s.appendChild(document.createTextNode(String(v)));
+    box.appendChild(s);any=true;
+  });
+  if(m.gps&&typeof m.gps==="object"){
+    var s2=h("span");s2.appendChild(h("b",null,"GPS: "));s2.appendChild(document.createTextNode(JSON.stringify(m.gps)));
+    box.appendChild(s2);any=true;
+  }
+  if(!any)box.appendChild(h("span",null,"SIN CAMPOS EXTRAÍDOS"));
 }
-document.addEventListener("keydown", onKey);
-modal.onclick = function(ev){
-if(ev.target === modal) cleanup();
-};
 
-var closeBtn = document.createElement("button");
-closeBtn.type="button";
-closeBtn.style.position="fixed";closeBtn.style.top="14px";closeBtn.style.right="14px";
-closeBtn.style.background="#080c09";closeBtn.style.color="#fff";closeBtn.style.border="1px solid #fff";
-closeBtn.style.padding="8px 12px";closeBtn.style.cursor="pointer";
-closeBtn.onclick=cleanup;
-closeBtn.textContent="CLOSE [ESC]";
+function renderRecon(data,url,status){
+  reconClear();
+  var ct=(data&&data.content_type)||"";
+  var remote=(data&&(data.http_status||data.status_code||data.estado_http))||null;
+  reconSet("recon-http","HTTP "+(status||"--")+" · INSPECTOR"+(remote?" / ORIGEN "+remote:""),status&&status>=400?"err":"");
+  reconSet("recon-ct",ct||"NO REPORTADO");
+  reconSet("recon-tipo",(data&&data.tipo_archivo)||"DESCONOCIDO");
+  reconSet("recon-size",fmtBytes(data&&data.tamanio_bytes)+" / TOPE "+INSPECT_MAX_MB+" MiB");
+  reconSet("recon-url",url||"--");
+  reconSet("recon-hash",(data&&data.sha256)||"NO DISPONIBLE","hash");
+  var alerts=detectAlerts(data,url,status);
+  if(alerts.length)alerts.forEach(function(a){reconAlert(a[0],a[1])});
+  else{var box=$("recon-alerts");if(box)box.appendChild(h("span","clean","SIN METADATOS OCULTOS NI SEÑALES ADVERSAS"))}
+  renderMetaDetail((data&&data.metadatos)||{});
+  setReconOpen(true);
+}
 
-var title = document.createElement("h2");
-title.style.margin="0 0 12px";title.style.fontSize="16px";
-title.textContent="INSPECCIÓN DE METADATOS - " + url;
-
-var summaryDiv = document.createElement("div");
-summaryDiv.style.display="flex";summaryDiv.style.flexWrap="wrap";summaryDiv.style.gap="16px";
-summaryDiv.style.marginBottom="14px";summaryDiv.style.padding="10px 12px";
-summaryDiv.style.border="1px solid #2b3a2e";summaryDiv.style.background="#071109";
-var sTipo = document.createElement("span");
-sTipo.textContent = "Tipo: " + (data.tipo_archivo || "desconocido");
-var sSize = document.createElement("span");
-sSize.textContent = "Tamaño: " + (data.tamanio_bytes != null ? data.tamanio_bytes + " B" : "N/D");
-summaryDiv.appendChild(sTipo);
-summaryDiv.appendChild(sSize);
-
-var jsonDiv = document.createElement("pre");
-jsonDiv.style.background="#111";jsonDiv.style.padding="15px";jsonDiv.style.borderRadius="4px";jsonDiv.style.overflow="auto";
-jsonDiv.textContent = JSON.stringify(data, null, 2);
-
-var hashDiv = document.createElement("div");
-hashDiv.style.marginTop="16px";hashDiv.style.paddingTop="12px";hashDiv.style.borderTop="1px solid #444";
-var hashLabel = document.createElement("strong");
-hashLabel.textContent = "SHA-256 Verificado: ";
-var hashVal = document.createElement("span");
-hashVal.textContent = data.sha256 || "No disponible";
-hashDiv.appendChild(hashLabel);
-hashDiv.appendChild(hashVal);
-
-modal.appendChild(closeBtn);
-modal.appendChild(title);
-modal.appendChild(summaryDiv);
-modal.appendChild(jsonDiv);
-modal.appendChild(hashDiv);
-document.body.appendChild(modal);
+function doInspect(url,btn){
+  var u=String(url||"").trim();
+  if(!/^https?:\/\//i.test(u)){
+    reconClear();reconAlert("alert","URL NO VÁLIDA PARA RAYOS X");setReconOpen(true);setOp("RECON ERROR","err");return;
+  }
+  // Una sola inspección activa: evita saturar el circuito Tor con clics rápidos.
+  if(inspectBusy){reconAlert("warn","INSPECCIÓN EN CURSO — SOLICITUD DESCARTADA PARA NO SATURAR TOR");setReconOpen(true);return}
+  inspectBusy=true;
+  document.querySelectorAll(".xray").forEach(function(b){b.disabled=true});
+  setOp("RAYOS X","busy");
+  var ctrl=("AbortController" in window)?new AbortController():null;
+  var opts={cache:"no-store",headers:{Accept:"application/json"}};
+  if(ctrl){opts.signal=ctrl.signal;setTimeout(function(){try{ctrl.abort()}catch(e){}},22000)}
+  fetch("/inspect?url="+encodeURIComponent(u),opts)
+    .then(function(r){
+      if(!r.ok){
+        return r.json().catch(function(){return null}).then(function(j){
+          var err=new Error((j&&(j.detail||j.message))||("HTTP "+r.status));
+          err.code=r.status;throw err;
+        });
+      }
+      return r.json().then(function(d){renderRecon(d,u,r.status);setOp("RECON OK","ok")});
+    })
+    .catch(function(e){
+      if(e&&e.name==="AbortError"){var err2=new Error("TIMEOUT / INSPECTOR SIN RESPUESTA");err2.code=0;e=err2}
+      showInspectError(e);
+    })
+    .then(function(){
+      inspectBusy=false;
+      document.querySelectorAll(".xray").forEach(function(b){b.disabled=false});
+    });
 }
 
 // FASE 3: Exportar informe forense .MD
@@ -629,7 +736,7 @@ addEventListener("keydown", function(ev){
   var key=ev.key;
   if(key==="/"&&!typing){ev.preventDefault();$("q").focus();return}
   if(key==="Escape"){
-    if($("searvga-inspect-modal"))return; // el modal gestiona su propio Esc
+    if(reconOpen){setReconOpen(false);return}
     if(helpBox&&helpBox.classList.contains("on")){setHelp(false);return}
     var inp=$("q");
     if(inp&&document.activeElement===inp&&inp.value){inp.value="";setOp("LIMPIADO");return}
