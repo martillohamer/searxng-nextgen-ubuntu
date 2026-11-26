@@ -52,6 +52,18 @@ SearXNG también es accesible directamente en `http://127.0.0.1:8889/`. El resto
 - Tamaño máximo de descarga: `MAX_FILE_SIZE_MB=8` (8388608 bytes) por defecto. Se comprueba `Content-Length` y se corta el streaming en cuanto se supera el límite, con respuesta `413`.
 - Los códigos remotos `401`, `403`, `404` y `429` se propagan; otros fallos HTTP o de red vía Tor se devuelven como `502`.
 
+## Interfaz táctica (`ui/index.html`)
+
+Toda la lógica de la interfaz vive en un único archivo, sin librerías ni CDN. La CSP de Nginx sigue intacta (`script-src 'self' 'unsafe-inline'`, `connect-src 'self'` y el resto de directivas). El grafo es SVG inline creado con `createElementNS` y `addEventListener`; el dossier usa `crypto.subtle`. Web Crypto requiere contexto seguro: funciona en `http://127.0.0.1:8890` (localhost) o por HTTPS.
+
+| Fase | Control | Qué hace |
+| --- | --- | --- |
+| Fase 1 — Horizonte de Sucesos | `[RAYOS X]` en cada tarjeta y miniatura, panel `RECON` | Inspección bajo demanda vía `/inspect`: estado HTTP, Content-Type, tamaño con tope de 8 MiB, SHA-256 completo con copiar y alertas de EXIF/GPS/autor de PDF o redirecciones sospechosas. Una sola inspección activa para no saturar Tor. Badge `[N MOTORES]` cuando `/api/search` incluye `engines` por resultado. |
+| Fase 2 — Grafo Táctico | `GRAFO: OFF/ON` o tecla `G` | Grafo radial en SVG puro: consulta en el centro, dominios agrupados por frecuencia/motores y conceptos repetidos en títulos y snippets; grosor y brillo de aristas según relevancia. Clic en dominio filtra resultados; clic en concepto refina la búsqueda. La etiqueta central se trunca a 18 caracteres con ajuste de ancho y fuente compacta; el panel abierto deja 12 px de margen inferior. |
+| Fase 3 — Dossier Zero-Knowledge | `DOSSIER: OCULTO/ABIERTO` o tecla `D` | Captura resultados, inspecciones de Rayos X y notas en RAM. Cifrado con PBKDF2-SHA-256 (120.000 iteraciones) y AES-GCM-256, sal de 16 B e IV de 12 B aleatorios por operación; el texto plano se descarta al bloquear. Desbloqueo, `PURGAR RAM` y exportación local a `.md`/`.json`. Sin localStorage y sin envío de claves al backend. |
+
+Los atajos del HUD son `/` (buscar), `H` (HUD), `G` (grafo), `D` (dossier), `?` (ayuda) y `Esc` (cerrar panel/limpiar). La rotación de Tor se hace en el host con `./rotar-ip-tor.sh`; la UI no expone esa acción.
+
 ## Uso paso a paso
 
 1. Requisitos: Docker con Compose y `curl`.
