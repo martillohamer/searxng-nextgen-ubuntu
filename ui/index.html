@@ -184,6 +184,26 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 .dossier-hint.warn{color:#ffb000}
 .dossier-hint.err{color:#ff2d20}
 @media (max-width:560px){.dossier input[type=password]{width:140px}}
+/* FASE 4: CÉLULA DE INTELIGENCIA — LLM local bajo demanda, sin dependencias */
+.celula{display:none;margin:8px 0 0;border:1px solid var(--c2);background:rgba(0,0,0,.92);box-shadow:inset 0 0 18px var(--dim)}
+.celula.on{display:block;margin-bottom:12px}
+.celula-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:10px;letter-spacing:.16em;color:var(--c2)}
+.celula-h b{color:var(--c);font-weight:400}
+.celula button,.celula select,.celula input{font:inherit;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);background:transparent;border:1px solid var(--c2);padding:4px 8px;cursor:pointer}
+.celula button:hover{background:var(--c);color:var(--bg)}
+.celula select option{background:var(--bg);color:var(--c)}
+.celula input[type=text]{flex:1;min-width:120px;text-transform:none;letter-spacing:.04em;color:var(--txt)}
+.celula-row,.celula-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--dim)}
+.celula-row label{font-size:9px;letter-spacing:.12em;color:var(--c2);display:flex;align-items:center;gap:6px;flex:1;min-width:180px}
+.celula button.on{background:var(--c);color:var(--bg);box-shadow:0 0 12px var(--c)}
+.celula-status{font-size:9px;letter-spacing:.08em;color:var(--c2);margin-left:auto}
+.celula-status.ok{color:var(--c)}
+.celula-status.warn{color:#ffb000}
+.celula-status.err{color:#ff2d20}
+.celula-output{white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--txt);max-height:320px;overflow:auto;padding:10px 12px;border-bottom:1px solid var(--dim)}
+.celula-next{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px}
+.celula-next button{font-size:10px}
+@media (max-width:560px){.celula-row label{min-width:100%}}
 </style>
 </head>
 <body>
@@ -211,6 +231,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
     <span style="font-size:10px;color:var(--c2);letter-spacing:.1em">TOR ROT: ./rotar-ip-tor.sh (host)</span>
     <button id="recon-toggle" type="button" aria-expanded="false" aria-controls="recon">RECON: OCULTO</button>
     <button id="dossier-toggle" type="button" aria-expanded="false" aria-controls="dossier">DOSSIER: OCULTO</button>
+    <button id="celula-toggle" type="button" aria-expanded="false" aria-controls="celula">CÉLULA: OCULTO</button>
     <button id="hud-refresh" type="button">REFRESH</button>
   </div>
 
@@ -266,11 +287,32 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
       <span class="dossier-hint" id="dossier-hint">SIN PERSISTENCIA · SIN ENVÍO DE CLAVES</span>
     </div>
   </section>
+  <!-- FASE 4: CÉLULA DE INTELIGENCIA Y GUION TÁCTICO -->
+  <section class="celula" id="celula" aria-label="Célula de Inteligencia Local">
+    <div class="celula-h"><span>CÉLULA DE INTELIGENCIA <b>// GUION TÁCTICO</b></span><button id="celula-close" type="button">CERRAR [I]</button></div>
+    <div class="celula-row">
+      <label>MODO <select id="celula-mode"><option value="briefing">BRIEFING</option><option value="guion">GUION 9:16</option><option value="angulos">ÁNGULOS</option></select></label>
+      <label>CONSULTA <input id="celula-query" type="text" autocomplete="off" spellcheck="false" placeholder="usa la consulta actual si se deja vacío"></label>
+    </div>
+    <div class="celula-row">
+      <button id="celula-inc-results" type="button" aria-pressed="true" class="on">RESULTADOS: ON</button>
+      <button id="celula-inc-inspect" type="button" aria-pressed="true" class="on">RAYOS X: ON</button>
+      <button id="celula-inc-dossier" type="button" aria-pressed="true" class="on">DOSSIER: ON</button>
+    </div>
+    <div class="celula-actions">
+      <button id="celula-run" type="button">EJECUTAR ANÁLISIS</button>
+      <button id="celula-add" type="button">+ AÑADIR A DOSSIER</button>
+      <span class="celula-status" id="celula-status">LOCAL · CLAVE NUNCA ENVIADA</span>
+    </div>
+    <div class="celula-output" id="celula-output">SIN ANÁLISIS — EJECUTA LA CÉLULA CON EL MOTOR LLM LOCAL.</div>
+    <div class="celula-next" id="celula-next"></div>
+  </section>
   <div class="help" id="help">
-    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> HUD · <b>G</b> grafo · <b>D</b> dossier · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
+    ATAJOS: <b>/</b> enfocar busqueda · <b>Esc</b> cerrar modal / RECON / limpiar · <b>H</b> HUD · <b>G</b> grafo · <b>D</b> dossier · <b>I</b> célula · <b>?</b> ayuda · <b>Enter</b> ejecutar.<br>
     <b>[RAYOS X]</b> inspecciona un enlace bajo demanda vía Tor (máx. 8 MiB): nunca se lanza automaticamente.<br>
     <b>GRAFO</b> mapea dominios y conceptos de los resultados actuales en SVG puro; sin librerías ni peticiones externas.<br>
     <b>DOSSIER</b> cifra hallazgos en RAM con AES-GCM (Web Crypto). La clave vive solo en la sesión: nunca se guarda ni se envía.<br>
+    <b>CÉLULA</b> genera briefing, guion 9:16 o ángulos con el LLM local del host. Solo envía el contexto seleccionado; nunca la clave del dossier.<br>
     Rotacion de Tor: <b>./rotar-ip-tor.sh</b> en el host. La UI no expone esa accion.
   </div>
 
@@ -321,6 +363,8 @@ var root=document.documentElement,$=function(i){return document.getElementById(i
 var state={q:"",cat:"general",page:1,profile:"general",profileFilter:"",results:[],domainFilter:"",dossier:[],dossierLocked:false,dossierCipher:null,lastInspect:null};
 var grafoOn=false,GRAFO_NS="http://www.w3.org/2000/svg";
 var dossierOpen=false,dossierBusy=false,cryptoPass=null;
+var celulaOpen=false,celulaBusy=false,celulaResult=null;
+var celulaInclude={results:true,inspect:true,dossier:true};
 var HUD_KEY="searvga-hud",PROFILE_FILTER="filetype:md OR filetype:pdf";
 var lastHealth=null,lastApi=null,lastHealthAt=0;
 function hudCell(id,val,cls){var e=$(id);if(!e)return;e.textContent=val;e.className="v"+(cls?" "+cls:"")}
@@ -751,6 +795,90 @@ if($("dossier-purge"))$("dossier-purge").addEventListener("click",dossierPurge);
 if($("dossier-md"))$("dossier-md").addEventListener("click",function(){dossierExport("md")});
 if($("dossier-json"))$("dossier-json").addEventListener("click",function(){dossierExport("json")});
 
+// FASE 4: CÉLULA DE INTELIGENCIA — LLM local bajo demanda, sin secretos ni disco
+function celulaMsg(txt,kind){var e=$("celula-status");if(e){e.textContent=txt;e.className="celula-status"+(kind?" "+kind:"")}}
+function setCelulaOpen(on){
+  celulaOpen=!!on;
+  var p=$("celula");if(p)p.classList.toggle("on",celulaOpen);
+  var b=$("celula-toggle");if(b){b.textContent="CÉLULA: "+(celulaOpen?"ABIERTO":"OCULTO");b.setAttribute("aria-expanded",celulaOpen?"true":"false")}
+}
+function celulaToggle(kind,label,btn){
+  celulaInclude[kind]=!celulaInclude[kind];
+  var on=celulaInclude[kind];
+  if(btn){btn.classList.toggle("on",on);btn.setAttribute("aria-pressed",on?"true":"false");btn.textContent=label+": "+(on?"ON":"OFF")}
+}
+function celulaCollect(){
+  var sel=$("celula-mode"),qi=$("celula-query");
+  var payload={mode:sel?sel.value:"briefing",query:String(qi&&qi.value||"").trim()||state.q||""};
+  if(celulaInclude.results&&state.results&&state.results.length){
+    payload.results=state.results.slice(0,20).map(function(r){
+      return {title:r.title||"",url:r.url||"",content:String(r.content||"").slice(0,300),engines:r.engines||[]};
+    });
+  }
+  if(celulaInclude.inspect&&state.lastInspect)payload.inspect_data=state.lastInspect;
+  if(celulaInclude.dossier&&!state.dossierLocked&&state.dossier&&state.dossier.length){
+    payload.dossier_entries=state.dossier.slice(-20);
+  }
+  return payload;
+}
+function celulaRender(){
+  var out=$("celula-output"),next=$("celula-next");if(!out||!next)return;
+  out.textContent=(celulaResult&&celulaResult.text)||"";
+  next.textContent="";
+  ((celulaResult&&celulaResult.next_queries)||[]).forEach(function(q){
+    var b=h("button",null,q);b.type="button";b.title="Lanzar búsqueda sugerida";
+    b.addEventListener("click",function(){var inp=$("q");if(inp)inp.value=q;run(q,1,false)});
+    next.appendChild(b);
+  });
+}
+function celulaRun(){
+  if(celulaBusy){celulaMsg("ANÁLISIS EN CURSO","warn");return}
+  var payload=celulaCollect();
+  if(!payload.query){celulaMsg("INTRODUCE UNA CONSULTA PARA ANALIZAR","err");return}
+  celulaBusy=true;celulaResult=null;setOp("CÉLULA","busy");
+  var runBtn=$("celula-run");if(runBtn)runBtn.disabled=true;
+  var ctrl=("AbortController" in window)?new AbortController():null;
+  var opts={method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(payload)};
+  if(ctrl){opts.signal=ctrl.signal;setTimeout(function(){try{ctrl.abort()}catch(e){}},60000)}
+  fetch("/analyze",opts)
+    .then(function(r){
+      return r.json().catch(function(){return null}).then(function(j){return {ok:r.ok,code:r.status,data:j}});
+    })
+    .then(function(x){
+      if(!x.ok||!x.data||x.data.ok===false){
+        var msg=(x.data&&(x.data.error||x.data.detail))||("HTTP "+x.code);
+        throw new Error(msg);
+      }
+      celulaResult=x.data;celulaResult.query=payload.query;
+      celulaRender();celulaMsg("ANÁLISIS LISTO · "+(x.data.model||"LOCAL"),"ok");setOp("CÉLULA OK","ok");
+    })
+    .catch(function(e){
+      if(e&&e.name==="AbortError")e=new Error("TIMEOUT DEL MOTOR LLM LOCAL");
+      var msg=(e&&e.message)?e.message:String(e);
+      celulaMsg("ERROR: "+msg,"err");setOp("CÉLULA ERROR","err");
+      var out=$("celula-output");if(out)out.textContent="NO SE PUDO GENERAR EL ANÁLISIS — "+msg;
+      var next=$("celula-next");if(next)next.textContent="";
+    })
+    .then(function(){
+      celulaBusy=false;var b=$("celula-run");if(b)b.disabled=false;
+    });
+}
+function celulaAdd(){
+  if(!celulaResult||!celulaResult.text){celulaMsg("NO HAY ANÁLISIS PARA GUARDAR","warn");return}
+  dossierAdd("ANÁLISIS","Célula ["+celulaResult.mode+"]: "+(celulaResult.query||state.q||"--"),"",{
+    mode:celulaResult.mode,query:celulaResult.query||"",text:celulaResult.text,
+    next_queries:celulaResult.next_queries||[],model:celulaResult.model||""
+  });
+  celulaMsg("ANÁLISIS AÑADIDO AL DOSSIER RAM","ok");
+}
+if($("celula-toggle"))$("celula-toggle").addEventListener("click",function(){setCelulaOpen(!celulaOpen)});
+if($("celula-close"))$("celula-close").addEventListener("click",function(){setCelulaOpen(false)});
+if($("celula-inc-results"))$("celula-inc-results").addEventListener("click",function(){celulaToggle("results","RESULTADOS",this)});
+if($("celula-inc-inspect"))$("celula-inc-inspect").addEventListener("click",function(){celulaToggle("inspect","RAYOS X",this)});
+if($("celula-inc-dossier"))$("celula-inc-dossier").addEventListener("click",function(){celulaToggle("dossier","DOSSIER",this)});
+if($("celula-run"))$("celula-run").addEventListener("click",celulaRun);
+if($("celula-add"))$("celula-add").addEventListener("click",celulaAdd);
+
 function status(ok,msg,ms,cnt){
   $("dot").className="dot "+(ok?"ok":"err");
   $("link").textContent=msg;
@@ -1159,6 +1287,7 @@ addEventListener("keydown", function(ev){
   if(!typing&&(key==="h"||key==="H")){setHud(root.getAttribute("data-hud")!=="1");return}
   if(!typing&&(key==="g"||key==="G")){setGrafoOn(!grafoOn);return}
   if(!typing&&(key==="d"||key==="D")){setDossierOpen(!dossierOpen);return}
+  if(!typing&&(key==="i"||key==="I")){setCelulaOpen(!celulaOpen);return}
   if(!typing&&key==="?"){ev.preventDefault();setHelp(!helpBox.classList.contains("on"))}
 });
 

@@ -21,7 +21,7 @@ import httpx
 import exifread
 from PIL import Image
 from pypdf import PdfReader
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.responses import JSONResponse
 
 # Configuración de memoria y límites
@@ -29,6 +29,33 @@ MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "8"))
 MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024  # Límite seguro en RAM para 256 MiB
 MAX_MEMORY_MB = 256
 TOR_PROXY = os.getenv("TOR_PROXY", "socks5h://searvga_tor:9150")  # a través de searvga_tor
+
+# Motor LLM local compatible con OpenAI (host, sin pasar por Tor ni por disco)
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://host.docker.internal:3001/v1").rstrip("/")
+LLM_MODEL = os.getenv("LLM_MODEL", "auto")
+try:
+    LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "35"))
+except (TypeError, ValueError):
+    LLM_TIMEOUT_S = 35.0
+
+ANALYZE_MODES = ("briefing", "guion", "angulos")
+ANALYZE_SYSTEM_PROMPTS = {
+    "briefing": (
+        "Eres un analista tactico de SEARVGA. Redacta en espanol un briefing operativo "
+        "conciso con hallazgos, riesgos y siguiente paso. Responde unicamente con un objeto JSON "
+        "con las claves 'text' (string) y 'next_queries' (array de hasta 3 consultas utiles)."
+    ),
+    "guion": (
+        "Eres un guionista de contenidos verticales 9:16. Convierte la informacion en un guion "
+        "tactico por escenas con plano, voz en off y duracion aproximada. Responde unicamente con "
+        "un objeto JSON con las claves 'text' (string) y 'next_queries' (array de hasta 3 consultas)."
+    ),
+    "angulos": (
+        "Eres un analista de investigacion. Propone angulos de profundizacion, contradicciones "
+        "y preguntas abiertas a partir de la evidencia. Responde unicamente con un objeto JSON con "
+        "las claves 'text' (string) y 'next_queries' (array de hasta 3 consultas)."
+    ),
+}
 
 # Rangos y direcciones IP privadas/bloqueadas para la URL de destino
 _PRIVATE_NETWORKS = [
@@ -473,6 +500,161 @@ async def inspect_url(url: str = Query(..., description="URL del archivo a inspe
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno de inspección: {str(e)}")
+
+
+def _compact(value, max_chars=300):
+    """Recorta texto o serializa valores de forma segura para el prompt."""
+    text = " ".join(str(value if value is not None else "").split())
+    return text[:max_chars] + ("…" if len(text) > max_chars else "")
+
+
+def _limit_obj(value, depth=0):
+    """Copia acotada en RAM para no enviar payloads enormes al LLM local."""
+    if isinstance(value, str):
+        return _compact(value)
+    if isinstance(value, list):
+        return [_limit_obj(v, depth + 1) for v in value[:12]]
+    if isinstance(value, dict):
+        return {str(k)[:60]: _limit_obj(v, depth + 1) for k, v in list(value.items())[:40]}
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    return _compact(value)
+
+
+def _build_analysis_context(query, results, inspect_data, dossier_entries):
+    context = {"modo": "analisis", "consulta": _compact(query, 500)}
+    if isinstance(results, list) and results:
+        context["resultados"] = [_limit_obj(r, 1) for r in results[:12] if r]
+    if isinstance(inspect_data, dict) and inspect_data:
+        context["inspeccion_rayos_x"] = _limit_obj(inspect_data, 1)
+    if isinstance(dossier_entries, list) and dossier_entries:
+        context["dossier"] = [_limit_obj(e, 1) for e in dossier_entries[-20:]]
+    return context
+
+
+async def _resolve_llm_model(client):
+    """Con LLM_MODEL=auto toma el primer modelo publicado por el servidor local."""
+    if LLM_MODEL and LLM_MODEL.lower() != "auto":
+        return LLM_MODEL
+    try:
+        response = await client.get(LLM_BASE_URL + "/models", timeout=min(5.0, LLM_TIMEOUT_S))
+        if response.status_code == 200:
+            ids = [
+                m.get("id") for m in response.json().get("data", [])
+                if isinstance(m, dict) and m.get("id")
+            ]
+            if ids:
+                return str(ids[0])
+    except Exception:
+        pass
+    return "local-model"
+
+
+def _parse_llm_response(content):
+    """Acepta JSON con text/next_queries o texto plano; nunca escribe en disco."""
+    text = str(content or "").strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    next_queries = []
+    if text:
+        try:
+            obj = json.loads(text)
+            if isinstance(obj, dict):
+                raw_text = (
+                    obj.get("text") or obj.get("content") or obj.get("analysis")
+                    or obj.get("briefing") or ""
+                )
+                text = _compact(raw_text, 12000) if raw_text else ""
+                raw_queries = obj.get("next_queries") or obj.get("suggestions") or []
+                if isinstance(raw_queries, str):
+                    raw_queries = [raw_queries]
+                if isinstance(raw_queries, list):
+                    next_queries = [
+                        _compact(q, 160) for q in raw_queries
+                        if isinstance(q, (str, int, float)) and str(q).strip()
+                    ][:3]
+        except (ValueError, TypeError):
+            pass
+    return text, next_queries
+
+
+@app.post("/analyze")
+async def analyze(payload: Dict[str, Any] = Body(...)):
+    """
+    Célula de inteligencia local: delega en un LLM OpenAI-compatible en el host.
+    Solo trabaja en RAM; ningún dato ni respuesta se escribe en disco.
+    """
+    mode = payload.get("mode") if isinstance(payload, dict) else None
+    query = payload.get("query") if isinstance(payload, dict) else None
+    if mode not in ANALYZE_MODES:
+        return JSONResponse(status_code=400, content={
+            "ok": False, "error": "mode debe ser briefing, guion o angulos", "mode": mode
+        })
+    if not isinstance(query, str) or not query.strip():
+        return JSONResponse(status_code=400, content={
+            "ok": False, "error": "query es obligatoria y no puede estar vacia", "mode": mode
+        })
+
+    context = _build_analysis_context(
+        query.strip(),
+        payload.get("results"),
+        payload.get("inspect_data"),
+        payload.get("dossier_entries"),
+    )
+    messages = [
+        {"role": "system", "content": ANALYZE_SYSTEM_PROMPTS[mode]},
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
+    ]
+    try:
+        timeout = httpx.Timeout(LLM_TIMEOUT_S, connect=min(5.0, LLM_TIMEOUT_S))
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            model = await _resolve_llm_model(client)
+            response = await client.post(
+                LLM_BASE_URL + "/chat/completions",
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.3,
+                    "max_tokens": 1400,
+                },
+            )
+            response.raise_for_status()
+            llm_data = response.json()
+    except httpx.TimeoutException:
+        return JSONResponse(status_code=502, content={
+            "ok": False, "error": "El motor LLM local no respondio a tiempo", "mode": mode
+        })
+    except Exception as exc:
+        return JSONResponse(status_code=502, content={
+            "ok": False,
+            "error": "No se pudo contactar con el motor LLM local",
+            "detalle": _compact(str(exc), 200),
+            "mode": mode,
+        })
+
+    try:
+        content = llm_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except (AttributeError, IndexError, TypeError, KeyError):
+        content = ""
+    text, next_queries = _parse_llm_response(content)
+    if not text:
+        return JSONResponse(status_code=503, content={
+            "ok": False, "error": "El motor LLM local no devolvio contenido valido", "mode": mode
+        })
+
+    return JSONResponse(content={
+        "ok": True,
+        "mode": mode,
+        "text": text,
+        "next_queries": next_queries,
+        "model": model,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
 
 
 @app.get("/health")
