@@ -132,7 +132,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 @media (max-width:560px){.recon-body,.recon .kv{grid-template-columns:1fr}}
 /* FASE 2: GRAFO TÁCTICO DE ENTIDADES — SVG puro, sin dependencias ni CDN */
 .grafo{display:none;margin:8px 0 0;border:1px solid var(--c2);background:rgba(0,0,0,.92);box-shadow:inset 0 0 18px var(--dim)}
-.grafo.on{display:block}
+.grafo.on{display:block;margin-bottom:12px}
 .grafo-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--dim);font-size:10px;letter-spacing:.16em;color:var(--c2)}
 .grafo-h b{color:var(--c);font-weight:400}
 .grafo-h .tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -150,6 +150,7 @@ button[data-onion="1"].onion-on{border-color:#ff2d20!important;color:#fff!import
 .grafo .node.act circle{stroke:#ffb000;fill:rgba(255,176,0,.14)}
 .grafo .node text{fill:var(--txt);font-family:inherit;font-size:10px;text-anchor:middle;pointer-events:none;letter-spacing:.04em}
 .grafo .node.core text{fill:var(--c);font-size:12px}
+.grafo .node.core text.compact{font-size:9px;letter-spacing:0}
 .grafo .empty{fill:var(--c2);font-family:inherit;font-size:12px;text-anchor:middle;letter-spacing:.1em}
 .grafo .legend{padding:6px 10px;border-top:1px solid var(--dim);font-size:10px;letter-spacing:.1em;color:var(--c2)}
 .res.off,.img.off{display:none!important}
@@ -492,8 +493,15 @@ function grafoNode(svg,x,y,label,weight,kind,tip,onClick){
   var r=kind==="core"?30:(kind==="dom"?9+Math.min(7,weight*0.9):7+Math.min(5,weight*0.6));
   var g=svgEl("g",{class:"node "+kind,tabindex:"0",role:"button","aria-label":tip});
   g.appendChild(svgEl("circle",{cx:x.toFixed(1),cy:y.toFixed(1),r:r.toFixed(1)}));
-  var tx=svgEl("text",{x:x.toFixed(1),y:(kind==="core"?y+4:y+r+12).toFixed(1)});
-  tx.textContent=label.length>22?label.slice(0,21)+"…":label;
+  var isCore=kind==="core";
+  var shown=isCore?(label.length>18?label.slice(0,17)+"…":label):(label.length>22?label.slice(0,21)+"…":label);
+  var tx=svgEl("text",{x:x.toFixed(1),y:(isCore?(shown.length>12?y+3:y+4):y+r+12).toFixed(1)});
+  if(isCore){
+    tx.setAttribute("textLength","52");
+    tx.setAttribute("lengthAdjust","spacingAndGlyphs");
+    if(shown.length>12)tx.setAttribute("class","compact");
+  }
+  tx.textContent=shown;
   g.appendChild(tx);
   var title=svgEl("title");title.textContent=tip;g.appendChild(title);
   g.addEventListener("click",onClick);
